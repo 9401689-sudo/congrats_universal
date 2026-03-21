@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-import type { RenderingAdapter } from "./rendering-adapter.js";
+import type { RenderingAdapter } from "../../engine/rendering/rendering-adapter.js";
 
 export class LocalFileRenderingAdapter implements RenderingAdapter {
   constructor(private readonly outputDir: string) {}

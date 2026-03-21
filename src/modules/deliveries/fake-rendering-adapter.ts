@@ -1,4 +1,4 @@
-import type { RenderingAdapter } from "./rendering-adapter.js";
+import type { RenderingAdapter } from "../../engine/rendering/rendering-adapter.js";
 
 export class FakeRenderingAdapter implements RenderingAdapter {
   async renderFinal(input: {

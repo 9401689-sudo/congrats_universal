@@ -2,6 +2,9 @@ import type { FastifyBaseLogger } from "fastify";
 import type { Pool } from "pg";
 
 import type { AppConfig } from "../../config/env.js";
+import type { PreviewRenderer } from "../../engine/rendering/preview-renderer.js";
+import { PythonRendererWorkerClient } from "../../engine/rendering/python-renderer-worker-client.js";
+import type { RenderingAdapter } from "../../engine/rendering/rendering-adapter.js";
 import { createPgPool } from "../../infra/postgres.js";
 import { createRedisClient, type RedisClient } from "../../infra/redis.js";
 import { InMemoryDocumentsRepository } from "../documents/in-memory-documents-repository.js";
@@ -16,7 +19,6 @@ import { PostgresDeliveriesRepository } from "../deliveries/postgres-deliveries-
 import { PythonRenderDocAdapter } from "../deliveries/python-render-doc-adapter.js";
 import type { DeliveryTransport } from "../deliveries/delivery-transport.js";
 import type { DeliveriesRepository } from "../deliveries/deliveries-repository.js";
-import type { RenderingAdapter } from "../deliveries/rendering-adapter.js";
 import { InMemoryRequestsRepository } from "../requests/in-memory-requests-repository.js";
 import { PostgresRequestsRepository } from "../requests/postgres-requests-repository.js";
 import type { RequestsRepository } from "../requests/requests-repository.js";
@@ -36,9 +38,7 @@ import { PostgresUsersRepository } from "../users/postgres-users-repository.js";
 import type { UsersRepository } from "../users/users-repository.js";
 import { createVariantsRepository } from "../variants/create-variants-repository.js";
 import { PythonPreviewRenderer } from "../variants/python-preview-renderer.js";
-import type { PreviewRenderer } from "../variants/preview-renderer.js";
 import type { VariantsRepository } from "../variants/variants-repository.js";
-import { PythonRendererWorkerClient } from "../rendering/python-renderer-worker-client.js";
 
 export type ApplicationContext = {
   configSummary: {

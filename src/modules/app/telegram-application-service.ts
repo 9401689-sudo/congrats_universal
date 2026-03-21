@@ -1,5 +1,6 @@
 import type { NormalizedTelegramEvent } from "../../domain/events.js";
 import { createEmptySession, type BotSession } from "../../domain/session.js";
+import type { PreviewRenderer } from "../../engine/rendering/preview-renderer.js";
 import {
   campaignTimezoneKeyboard,
   currentCampaignRules,
@@ -13,7 +14,6 @@ import type { RequestsRepository } from "../requests/requests-repository.js";
 import type { SessionStore } from "../session/session-store.js";
 import type { TelegramGateway } from "../telegram/telegram-gateway.js";
 import type { UsersRepository } from "../users/users-repository.js";
-import type { PreviewRenderer } from "../variants/preview-renderer.js";
 import type { VariantsRepository } from "../variants/variants-repository.js";
 import { buildPreviewVariant } from "../variants/preview-builder.js";
 import { handleBotEvent } from "../bot/handle-bot-event.js";

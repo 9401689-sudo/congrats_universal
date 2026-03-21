@@ -2,9 +2,9 @@ import { mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
 
 import { buildCampaignRenderPayload } from "../../campaigns/current-campaign-renderer.js";
+import type { PreviewRenderer } from "../../engine/rendering/preview-renderer.js";
+import type { PythonRendererWorkerClient } from "../../engine/rendering/python-renderer-worker-client.js";
 import type { VariantSnapshot } from "../../domain/variant.js";
-import type { PythonRendererWorkerClient } from "../rendering/python-renderer-worker-client.js";
-import type { PreviewRenderer } from "./preview-renderer.js";
 
 type PythonPreviewRendererOptions = {
   outputDir: string;
