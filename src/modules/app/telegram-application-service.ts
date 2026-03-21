@@ -1,5 +1,6 @@
 import type { NormalizedTelegramEvent } from "../../domain/events.js";
 import { createEmptySession, type BotSession } from "../../domain/session.js";
+import { currentCampaignTexts } from "../../campaigns/current-campaign-texts.js";
 import type { PaymentService } from "../payments/payment-service.js";
 import type { PaymentsRepository } from "../payments/payments-repository.js";
 import type { RequestsRepository } from "../requests/requests-repository.js";
@@ -64,7 +65,10 @@ export class TelegramApplicationService {
             chatId: event.chatId ?? nextSession.chatId ?? nextSession.tgUserId,
             text: `Принято: ${effect.username}. Можно продолжить оплату.`,
             replyMarkup: {
-              inline_keyboard: [[{ text: "💳 Продолжить оплату", callback_data: "PAY:199" }]]
+              inline_keyboard: [[{
+                text: currentCampaignTexts.buttons.continuePayment,
+                callback_data: "PAY:199"
+              }]]
             }
           });
           break;
@@ -77,12 +81,12 @@ export class TelegramApplicationService {
           };
           await this.telegramGateway.sendMessage({
             chatId: event.chatId ?? nextSession.chatId ?? nextSession.tgUserId,
-            text: "🏛 Бюро «Разрешено»\n\nEmail сохранен. Можно продолжить оплату.",
+            text: currentCampaignTexts.prompts.emailSaved,
             replyMarkup: nextSession.tariffPending
               ? {
                   inline_keyboard: [[
                     {
-                      text: "💳 Продолжить оплату",
+                      text: currentCampaignTexts.buttons.continuePayment,
                       callback_data: `PAY:${nextSession.tariffPending}`
                     }
                   ]]
@@ -115,12 +119,12 @@ export class TelegramApplicationService {
       case "2_START_INTRO":
         await this.telegramGateway.sendMessage({
           chatId: event.chatId ?? session.chatId ?? session.tgUserId,
-          text: "🏛 Бюро «Разрешено»\n\nВыберите дальнейшее действие.",
+          text: currentCampaignTexts.prompts.chooseAction,
           replyMarkup: session.activeRequestId
             ? {
                 inline_keyboard: [
-                  [{ text: "Продолжить обращение", callback_data: "START_CONTINUE" }],
-                  [{ text: "Начать заново", callback_data: "START_FORCE_NEW" }]
+                  [{ text: currentCampaignTexts.buttons.continueCurrentRequest, callback_data: "START_CONTINUE" }],
+                  [{ text: currentCampaignTexts.buttons.restart, callback_data: "START_FORCE_NEW" }]
                 ]
               }
             : {
@@ -165,7 +169,7 @@ export class TelegramApplicationService {
 
         await this.telegramGateway.sendMessage({
           chatId: event.chatId ?? session.chatId ?? session.tgUserId,
-          text: "🏛 Бюро «Разрешено»\n\nУкажите имя получателя."
+          text: currentCampaignTexts.prompts.enterRecipientName
         });
 
         return nextSession;
@@ -187,9 +191,9 @@ export class TelegramApplicationService {
         if (!requestId || !request) {
           await this.telegramGateway.sendMessage({
             chatId: event.chatId ?? session.chatId ?? session.tgUserId,
-            text: "Активное обращение не найдено. Начните заново.",
+            text: currentCampaignTexts.prompts.noActiveRequest,
             replyMarkup: {
-              inline_keyboard: [[{ text: "Начать заново", callback_data: "START_NEW" }]]
+              inline_keyboard: [[{ text: currentCampaignTexts.buttons.restart, callback_data: "START_NEW" }]]
             }
           });
           return {
@@ -201,7 +205,7 @@ export class TelegramApplicationService {
         if (!request.recipientName) {
           await this.telegramGateway.sendMessage({
             chatId: event.chatId ?? session.chatId ?? session.tgUserId,
-            text: "Продолжаем текущее обращение. Укажите имя получателя."
+            text: currentCampaignTexts.prompts.resumeNeedsRecipient
           });
           return {
             ...session,
@@ -219,7 +223,7 @@ export class TelegramApplicationService {
         if (recoveredLastVariantIdx < 1) {
           await this.telegramGateway.sendMessage({
             chatId: event.chatId ?? session.chatId ?? session.tgUserId,
-            text: "Продолжаем текущее обращение. Подготавливаю документ."
+            text: currentCampaignTexts.prompts.resumePreparing
           });
           return this.applyWorkflowEffect(
             {
@@ -259,7 +263,7 @@ export class TelegramApplicationService {
 
         await this.telegramGateway.sendMessage({
           chatId: event.chatId ?? session.chatId ?? session.tgUserId,
-          text: "Обращение зарегистрировано. Подготовка документа займет около минуты."
+          text: currentCampaignTexts.prompts.preparingDocument
         });
 
         return this.applyWorkflowEffect(
@@ -305,33 +309,23 @@ export class TelegramApplicationService {
         };
 
         const remaining = 3 - variant.idx;
-        const availability =
-          remaining === 2
-            ? "Осталось 2 варианта в рамках текущего обращения.\n\n"
-            : remaining === 1
-              ? "Остался 1 вариант в рамках текущего обращения.\n\n"
-              : "Подготовка вариантов в рамках текущего обращения завершена.\n\n";
-
         const variantReplyMarkup =
           variant.idx < 3
             ? {
                 inline_keyboard: [
-                  [{ text: "Подготовить другой вариант", callback_data: "GEN_NEXT" }],
-                  [{ text: "Перейти к заверению", callback_data: "GO_SEAL" }]
+                  [{ text: currentCampaignTexts.buttons.prepareNextVariant, callback_data: "GEN_NEXT" }],
+                  [{ text: currentCampaignTexts.buttons.goToSeal, callback_data: "GO_SEAL" }]
                 ]
               }
             : {
                 inline_keyboard: [
-                  [{ text: "Вариант 1", callback_data: "SEAL_PICK:1" }],
-                  [{ text: "Вариант 2", callback_data: "SEAL_PICK:2" }],
-                  [{ text: "Вариант 3", callback_data: "SEAL_PICK:3" }]
+                  [{ text: currentCampaignTexts.buttons.pickVariant(1), callback_data: "SEAL_PICK:1" }],
+                  [{ text: currentCampaignTexts.buttons.pickVariant(2), callback_data: "SEAL_PICK:2" }],
+                  [{ text: currentCampaignTexts.buttons.pickVariant(3), callback_data: "SEAL_PICK:3" }]
                 ]
               };
 
-        const variantText =
-          `🏛 Бюро «Разрешено»\n\nПодготовлен вариант №${variant.idx}.\n` +
-          availability +
-          "Вступает в силу немедленно.\nОбжалованию не подлежит.";
+        const variantText = currentCampaignTexts.variant.prepared(variant.idx, remaining);
 
         if (this.previewRenderer) {
           const preview = await this.previewRenderer.renderPreview({
@@ -359,9 +353,9 @@ export class TelegramApplicationService {
         if (!session.activeRequestId || session.lastVariantIdx < 1) {
           await this.telegramGateway.sendMessage({
             chatId: event.chatId ?? session.chatId ?? session.tgUserId,
-            text: "🏛 Бюро «Разрешено»\n\nСначала подготовьте хотя бы один вариант.",
+            text: currentCampaignTexts.variant.noVariantsYet,
             replyMarkup: {
-              inline_keyboard: [[{ text: "Подготовить документ", callback_data: "GEN_FIRST" }]]
+              inline_keyboard: [[{ text: currentCampaignTexts.buttons.prepareDocument, callback_data: "GEN_FIRST" }]]
             }
           });
           return session;
@@ -372,7 +366,7 @@ export class TelegramApplicationService {
             { length: session.lastVariantIdx },
             (_, index) => [
               {
-                text: `Вариант ${index + 1}`,
+                text: currentCampaignTexts.buttons.pickVariant(index + 1),
                 callback_data: `SEAL_PICK:${index + 1}`
               }
             ]
@@ -380,14 +374,11 @@ export class TelegramApplicationService {
 
           await this.telegramGateway.sendMessage({
             chatId: event.chatId ?? session.chatId ?? session.tgUserId,
-            text:
-              "🏛 Бюро «Разрешено»\n\nДля вступления документа в силу требуется заверение.\n\n" +
-              `Сейчас подготовлено вариантов: ${session.lastVariantIdx}.\n` +
-              "Выберите вариант для заверения или подготовьте еще один.",
+            text: currentCampaignTexts.variant.sealChoicePartial(session.lastVariantIdx),
             replyMarkup: {
               inline_keyboard: [
                 ...generatedVariantButtons,
-                [{ text: "Подготовить другой вариант", callback_data: "GEN_NEXT" }]
+                [{ text: currentCampaignTexts.buttons.prepareNextVariant, callback_data: "GEN_NEXT" }]
               ]
             }
           });
@@ -396,14 +387,12 @@ export class TelegramApplicationService {
 
         await this.telegramGateway.sendMessage({
           chatId: event.chatId ?? session.chatId ?? session.tgUserId,
-          text:
-            "🏛 Бюро «Разрешено»\n\nДля вступления документа в силу требуется заверение.\n\n" +
-            "Подготовка вариантов завершена.\nУкажите вариант, подлежащий заверению.",
+          text: currentCampaignTexts.variant.sealChoiceFull,
           replyMarkup: {
             inline_keyboard: [
-              [{ text: "Вариант 1", callback_data: "SEAL_PICK:1" }],
-              [{ text: "Вариант 2", callback_data: "SEAL_PICK:2" }],
-              [{ text: "Вариант 3", callback_data: "SEAL_PICK:3" }]
+              [{ text: currentCampaignTexts.buttons.pickVariant(1), callback_data: "SEAL_PICK:1" }],
+              [{ text: currentCampaignTexts.buttons.pickVariant(2), callback_data: "SEAL_PICK:2" }],
+              [{ text: currentCampaignTexts.buttons.pickVariant(3), callback_data: "SEAL_PICK:3" }]
             ]
           }
         });
@@ -421,13 +410,11 @@ export class TelegramApplicationService {
         if (idx > session.lastVariantIdx) {
           await this.telegramGateway.sendMessage({
             chatId: event.chatId ?? session.chatId ?? session.tgUserId,
-            text:
-              `🏛 Бюро «Разрешено» \n\nВариант №${idx} еще не подготовлен.\n\n` +
-              `Сейчас доступно вариантов: ${session.lastVariantIdx}.`,
+            text: currentCampaignTexts.prompts.sealMissing(idx, session.lastVariantIdx),
             replyMarkup: {
               inline_keyboard: [
-                [{ text: "Подготовить другой вариант", callback_data: "GEN_NEXT" }],
-                [{ text: "Перейти к заверению", callback_data: "GO_SEAL" }]
+                [{ text: currentCampaignTexts.buttons.prepareNextVariant, callback_data: "GEN_NEXT" }],
+                [{ text: currentCampaignTexts.buttons.goToSeal, callback_data: "GO_SEAL" }]
               ]
             }
           });
@@ -438,10 +425,9 @@ export class TelegramApplicationService {
         if (!variant) {
           await this.telegramGateway.sendMessage({
             chatId: event.chatId ?? session.chatId ?? session.tgUserId,
-            text:
-              "🏛 Бюро «Разрешено» \nСрок хранения варианта истек.\nПодготовьте документ заново.",
+            text: currentCampaignTexts.prompts.sealExpired,
             replyMarkup: {
-              inline_keyboard: [[{ text: "Подготовить документ", callback_data: "GEN_FIRST" }]]
+              inline_keyboard: [[{ text: currentCampaignTexts.buttons.prepareDocument, callback_data: "GEN_FIRST" }]]
             }
           });
           return session;
@@ -452,25 +438,22 @@ export class TelegramApplicationService {
 
         await this.telegramGateway.sendMessage({
           chatId: event.chatId ?? session.chatId ?? session.tgUserId,
-          text:
-            `🏛 Бюро «Разрешено» \n\nВыбран вариант №${variant.idx}.\n\n` +
-            "Для вступления документа в силу требуется заверение.\n\n" +
-            "Вступает в силу немедленно.\nОбжалованию не подлежит.",
+          text: currentCampaignTexts.variant.selected(variant.idx),
           replyMarkup: {
             inline_keyboard: [
-              [{ text: "Заверить — 149 ₽", callback_data: "PAY:149" }],
+              [{ text: currentCampaignTexts.buttons.pay149, callback_data: "PAY:149" }],
               [
                 {
-                  text: "Заверить + направить 8 марта с 9:00 до 9:30 — 199 ₽",
+                  text: currentCampaignTexts.buttons.pay199,
                   callback_data: "PAY:199"
                 }
               ],
-              [{ text: "Выбрать другой вариант", callback_data: "GO_SEAL" }],
+              [{ text: currentCampaignTexts.buttons.chooseAnotherVariant, callback_data: "GO_SEAL" }],
               [
                 {
                   text: request?.initiatorTimezone
-                    ? `Часовой пояс: ${request.initiatorTimezone}. Сменить?`
-                    : "Часовой пояс: не установлен. Установить?",
+                    ? currentCampaignTexts.buttons.timezoneValue(request.initiatorTimezone)
+                    : currentCampaignTexts.buttons.setTimezone,
                   callback_data: "TZ_CHANGE"
                 }
               ]
@@ -487,9 +470,9 @@ export class TelegramApplicationService {
         if (!session.activeRequestId) {
           await this.telegramGateway.sendMessage({
             chatId: event.chatId ?? session.chatId ?? session.tgUserId,
-            text: "Перед оплатой нужно начать обращение заново.",
+            text: currentCampaignTexts.prompts.paymentNeedsRequest,
             replyMarkup: {
-              inline_keyboard: [[{ text: "Начать заново", callback_data: "START_NEW" }]]
+              inline_keyboard: [[{ text: currentCampaignTexts.buttons.restart, callback_data: "START_NEW" }]]
             }
           });
           return session;
@@ -503,9 +486,9 @@ export class TelegramApplicationService {
         if (!request.selectedVariantIdx) {
           await this.telegramGateway.sendMessage({
             chatId: event.chatId ?? session.chatId ?? session.tgUserId,
-            text: "Перед оплатой нужно выбрать вариант для заверения.",
+            text: currentCampaignTexts.prompts.paymentNeedsVariant,
             replyMarkup: {
-              inline_keyboard: [[{ text: "Перейти к заверению", callback_data: "GO_SEAL" }]]
+              inline_keyboard: [[{ text: currentCampaignTexts.buttons.goToSeal, callback_data: "GO_SEAL" }]]
             }
           });
           return session;
@@ -519,10 +502,7 @@ export class TelegramApplicationService {
         if (tariff === "199" && !request.initiatorTimezone) {
           await this.telegramGateway.sendMessage({
             chatId: event.chatId ?? session.chatId ?? session.tgUserId,
-            text:
-              "🏛 Бюро «Разрешено» \n\nДля тарифа «Заверить + направить» документ будет " +
-              "отправлен 8 марта с 09:00 (в течение нескольких минут) по вашему времени.\n\n" +
-              "Выберите ваш часовой пояс:",
+            text: currentCampaignTexts.prompts.chooseTimezone,
             replyMarkup: {
               inline_keyboard: [
                 [{ text: "MSK (UTC+3)", callback_data: "TZ:Europe/Moscow" }],
@@ -564,9 +544,7 @@ export class TelegramApplicationService {
         if (tariff === "199" && !hasRequestScopedDeliveryChoice) {
           await this.telegramGateway.sendMessage({
             chatId: event.chatId ?? session.chatId ?? session.tgUserId,
-            text:
-              "🏛 Бюро «Разрешено» \n\nВыберите способ вручения 8 марта.\n" +
-              "Бот не пишет получателю напрямую.",
+            text: currentCampaignTexts.prompts.chooseDeliveryMethod,
             replyMarkup: {
               inline_keyboard: [
                 [{ text: "🔒 Указать @username", callback_data: "DELIV_USERNAME" }],
@@ -589,9 +567,7 @@ export class TelegramApplicationService {
         if (!hasRequestScopedEmail) {
           await this.telegramGateway.sendMessage({
             chatId: event.chatId ?? session.chatId ?? session.tgUserId,
-            text:
-              "🏛 Бюро «Разрешено»\n\nУкажите email для отправки чека. " +
-              "Это обязательное условие для оплаты.\nПример: name@example.com"
+            text: currentCampaignTexts.prompts.enterEmail
           });
 
           return {
@@ -632,11 +608,9 @@ export class TelegramApplicationService {
 
         await this.telegramGateway.sendMessage({
           chatId: event.chatId ?? session.chatId ?? session.tgUserId,
-          text:
-            "Оплата подготовлена. Нажмите кнопку ниже:\n" +
-            payment.confirmationUrl,
+          text: currentCampaignTexts.prompts.preparedPayment(payment.confirmationUrl),
           replyMarkup: {
-            inline_keyboard: [[{ text: "💳 Оплатить", url: payment.confirmationUrl }]]
+            inline_keyboard: [[{ text: currentCampaignTexts.buttons.payNow, url: payment.confirmationUrl }]]
           }
         });
 
@@ -665,17 +639,17 @@ export class TelegramApplicationService {
         if (session.tzReturnTo === "seal_pick_tariffs") {
           await this.telegramGateway.sendMessage({
             chatId: event.chatId ?? session.chatId ?? session.tgUserId,
-            text: "Часовой пояс сохранен. Можно продолжить выбор тарифа.",
+            text: currentCampaignTexts.prompts.timezoneSavedTariff,
             replyMarkup: {
               inline_keyboard: [
-                [{ text: "Заверить — 149 ₽", callback_data: "PAY:149" }],
+                [{ text: currentCampaignTexts.buttons.pay149, callback_data: "PAY:149" }],
                 [
                   {
-                    text: "Заверить + направить 8 марта с 9:00 до 9:30 — 199 ₽",
+                    text: currentCampaignTexts.buttons.pay199,
                     callback_data: "PAY:199"
                   }
                 ],
-                [{ text: "Выбрать другой вариант", callback_data: "GO_SEAL" }]
+                [{ text: currentCampaignTexts.buttons.chooseAnotherVariant, callback_data: "GO_SEAL" }]
               ]
             }
           });
@@ -700,7 +674,7 @@ export class TelegramApplicationService {
 
         await this.telegramGateway.sendMessage({
           chatId: event.chatId ?? session.chatId ?? session.tgUserId,
-          text: "Часовой пояс сохранен."
+          text: currentCampaignTexts.prompts.timezoneSaved
         });
 
         return {
@@ -720,9 +694,9 @@ export class TelegramApplicationService {
         }
         await this.telegramGateway.sendMessage({
           chatId: event.chatId ?? session.chatId ?? session.tgUserId,
-          text: "Способ вручения сохранен. Можно продолжить оплату.",
+          text: currentCampaignTexts.prompts.deliveryManualSaved,
           replyMarkup: {
-            inline_keyboard: [[{ text: "💳 Продолжить оплату", callback_data: "PAY:199" }]]
+            inline_keyboard: [[{ text: currentCampaignTexts.buttons.continuePayment, callback_data: "PAY:199" }]]
           }
         });
         return {
@@ -734,9 +708,7 @@ export class TelegramApplicationService {
       case "2_DELIV_USERNAME":
         await this.telegramGateway.sendMessage({
           chatId: event.chatId ?? session.chatId ?? session.tgUserId,
-          text:
-            "Укажите @username получателя (пример: @ivan_ivanov).\n\n" +
-            "Бот не напишет ему напрямую — 8 марта мы пришлем вам PNG и кнопку открытия чата."
+          text: currentCampaignTexts.prompts.enterDeliveryUsername
         });
         return {
           ...session,

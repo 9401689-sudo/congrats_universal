@@ -1,5 +1,6 @@
 import type { NormalizedTelegramEvent } from "../../domain/events.js";
 import type { BotSession } from "../../domain/session.js";
+import { currentCampaignTexts } from "../../campaigns/current-campaign-texts.js";
 import { routeTelegramEvent } from "./telegram-router.js";
 
 export type BotEffect =
@@ -28,7 +29,7 @@ export function handleBotEvent(
         {
           type: "send_message",
           chatId: event.chatId ?? session.chatId ?? session.tgUserId,
-          text: "Сейчас управление осуществляется кнопками."
+          text: currentCampaignTexts.prompts.buttonsOnly
         }
       ],
       session: {
