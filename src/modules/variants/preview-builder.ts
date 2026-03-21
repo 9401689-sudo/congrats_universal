@@ -1,9 +1,7 @@
 import type { BotSession } from "../../domain/session.js";
 import type { RequestRecord } from "../../domain/request.js";
 import type { VariantSnapshot } from "../../domain/variant.js";
-
-const ENGINE_VERSION = "engine-1";
-const ASSETS_VERSION = "assets-2026-02";
+import { currentCampaign } from "../../campaigns/current-campaign.js";
 type LayoutPreset = {
   opacity: number;
   rot: number;
@@ -53,24 +51,6 @@ const TEMPLATE_REGISTRY: Record<string, TemplatePreset> = {
 };
 
 const DEFAULT_BACKGROUNDS = ["bg1.png", "bg2.png", "bg3.png", "bg4.png", "bg5.png", "bg6.png"];
-const DEFAULT_INTROS = [
-  "Настоящим разрешается:",
-  "По итогам рассмотрения разрешается:",
-  "Бюро постановляет:"
-];
-const DEFAULT_POINTS = [
-  "Принимать поздравления без ограничений.",
-  "Не отвечать на лишние сообщения до особого распоряжения.",
-  "Сохранять торжественное выражение лица.",
-  "Требовать комплименты в разумном объеме.",
-  "Игнорировать мелкие недоразумения текущего дня.",
-  "Принимать сладкое и цветы без объяснений.",
-  "Объявлять сегодняшний день особым случаем.",
-  "Считать хорошее настроение обязательным к исполнению.",
-  "Допускать праздничные послабления режима.",
-  "Разрешать себе лучшие сценарии вечера."
-];
-
 export function buildPreviewVariant(input: {
   request: RequestRecord;
   session: BotSession;
@@ -87,8 +67,8 @@ export function buildPreviewVariant(input: {
   const seal = pickDeterministic(template.sealPresets, `${seed}:seal`);
   const stamp = pickDeterministic(template.stampPresets, `${seed}:stamp`);
   const bg = pickDeterministic(DEFAULT_BACKGROUNDS, `${seed}:bg`);
-  const intro = pickDeterministic(DEFAULT_INTROS, `${seed}:intro`);
-  const points = sampleDeterministic(DEFAULT_POINTS, `${seed}:points`, 8);
+  const intro = pickDeterministic(currentCampaign.document.introOptions, `${seed}:intro`);
+  const points = sampleDeterministic(currentCampaign.document.pointsPool, `${seed}:points`, 8);
 
   return {
     bg,
@@ -103,9 +83,9 @@ export function buildPreviewVariant(input: {
       stamp
     },
     meta: {
-      assetsVersion: ASSETS_VERSION,
+      assetsVersion: currentCampaign.document.assetsVersion,
       createdAt: Math.floor(Date.now() / 1000),
-      engineVersion: ENGINE_VERSION
+      engineVersion: currentCampaign.document.engineVersion
     },
     recipientName,
     templateId

@@ -1,6 +1,10 @@
 import { mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
 
+import {
+  buildCampaignDocumentNumber,
+  currentCampaign
+} from "../../campaigns/current-campaign.js";
 import type { VariantSnapshot } from "../../domain/variant.js";
 import type { PythonRendererWorkerClient } from "../rendering/python-renderer-worker-client.js";
 import type { PreviewRenderer } from "./preview-renderer.js";
@@ -27,13 +31,13 @@ export class PythonPreviewRenderer implements PreviewRenderer {
       mode: "preview",
       recipient_name: input.variant.recipientName,
       initiator_name: input.variant.initiatorName,
-      doc_no: `0803-${input.requestId.padStart(3, "0")}`,
-      templates_dir: this.options.templatesDir,
+      doc_no: buildCampaignDocumentNumber(input.requestId),
+      templates_dir: this.options.templatesDir ?? currentCampaign.renderer.templatesDir,
       bg: input.variant.bg,
       intro: input.variant.content.intro,
       points: input.variant.content.points,
       layout: input.variant.layout,
-      qr_url: "https://t.me/razresheno_buro_bot",
+      qr_url: currentCampaign.telegram.qrUrl,
       output_path: renderedPath
     };
 

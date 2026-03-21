@@ -1,3 +1,4 @@
+import { campaignTable } from "../../campaigns/current-campaign.js";
 import type { PaymentRecord } from "../../domain/payment.js";
 import type { PostgresExecutor } from "../../infra/postgres.js";
 import type { PaymentsRepository } from "./payments-repository.js";
@@ -15,7 +16,7 @@ export class PostgresPaymentsRepository implements PaymentsRepository {
     const result = await this.db.query<PaymentRow>(
       `
         select id, request_id, amount
-        from razreshenobot.payments
+        from ${campaignTable("payments")}
         where provider_payment_charge_id = $1
         limit 1;
       `,
@@ -46,7 +47,7 @@ export class PostgresPaymentsRepository implements PaymentsRepository {
   }): Promise<PaymentRecord> {
     const result = await this.db.query<PaymentRow>(
       `
-        INSERT INTO razreshenobot.payments (
+        INSERT INTO ${campaignTable("payments")} (
           request_id,
           payload,
           amount,
@@ -92,7 +93,7 @@ export class PostgresPaymentsRepository implements PaymentsRepository {
   async markCanceled(providerPaymentId: string): Promise<void> {
     await this.db.query(
       `
-        UPDATE razreshenobot.payments
+        UPDATE ${campaignTable("payments")}
         SET payload = payload || jsonb_build_object('yookassa_event', 'payment.canceled')
         WHERE provider_payment_charge_id = $1;
       `,
@@ -108,7 +109,7 @@ export class PostgresPaymentsRepository implements PaymentsRepository {
   }): Promise<PaymentRecord> {
     const result = await this.db.query<PaymentRow>(
       `
-        INSERT INTO razreshenobot.payments (
+        INSERT INTO ${campaignTable("payments")} (
           request_id,
           payload,
           amount,
@@ -132,7 +133,7 @@ export class PostgresPaymentsRepository implements PaymentsRepository {
         ON CONFLICT (provider_payment_charge_id)
         DO UPDATE SET
           status = 'paid'::public.payment_status,
-          paid_at = COALESCE(razreshenobot.payments.paid_at, now())
+          paid_at = COALESCE(${campaignTable("payments")}.paid_at, now())
         RETURNING id;
       `,
       [

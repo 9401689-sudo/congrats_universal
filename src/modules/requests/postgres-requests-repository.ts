@@ -1,3 +1,4 @@
+import { campaignTable } from "../../campaigns/current-campaign.js";
 import type { RequestRecord } from "../../domain/request.js";
 import type { PostgresExecutor } from "../../infra/postgres.js";
 import type { RequestsRepository } from "./requests-repository.js";
@@ -18,7 +19,7 @@ export class PostgresRequestsRepository implements RequestsRepository {
   async closeCompletedRequest(requestId: string): Promise<void> {
     await this.db.query(
       `
-        update razreshenobot.requests
+        update ${campaignTable("requests")}
         set
           status = 'closed'::public.request_status,
           closed_at = coalesce(closed_at, now())
@@ -32,7 +33,7 @@ export class PostgresRequestsRepository implements RequestsRepository {
   async createOpenRequest(userId: number): Promise<RequestRecord> {
     const result = await this.db.query<RequestRow>(
       `
-        insert into razreshenobot.requests (
+        insert into ${campaignTable("requests")} (
           user_id,
           status,
           created_at,
@@ -58,7 +59,7 @@ export class PostgresRequestsRepository implements RequestsRepository {
   async closeOpenRequest(requestId: string): Promise<void> {
     await this.db.query(
       `
-        update razreshenobot.requests
+        update ${campaignTable("requests")}
         set status = 'cancelled',
             closed_at = now(),
             updated_at = now()
@@ -80,8 +81,8 @@ export class PostgresRequestsRepository implements RequestsRepository {
           r.delivery_method,
           r.delivery_username,
           r.initiator_timezone
-        from razreshenobot.requests r
-        join razreshenobot.users u on u.id = r.user_id
+        from ${campaignTable("requests")} r
+        join ${campaignTable("users")} u on u.id = r.user_id
         where u.tg_user_id = $1::bigint
           and r.status = 'open'
         order by r.updated_at desc nulls last, r.created_at desc, r.id desc
@@ -110,7 +111,7 @@ export class PostgresRequestsRepository implements RequestsRepository {
     const result = await this.db.query<RequestRow>(
       `
         select id, recipient_name, status, selected_variant_idx, delivery_method, delivery_username, initiator_timezone
-        from razreshenobot.requests
+        from ${campaignTable("requests")}
         where id = $1::bigint
         limit 1;
       `,
@@ -136,7 +137,7 @@ export class PostgresRequestsRepository implements RequestsRepository {
   async setDeliveryManual(requestId: string): Promise<void> {
     await this.db.query(
       `
-        update razreshenobot.requests
+        update ${campaignTable("requests")}
         set delivery_method = 'manual'::public.delivery_method,
             delivery_username = null,
             updated_at = now()
@@ -149,7 +150,7 @@ export class PostgresRequestsRepository implements RequestsRepository {
   async setDeliveryUsername(requestId: string, username: string): Promise<void> {
     await this.db.query(
       `
-        update razreshenobot.requests
+        update ${campaignTable("requests")}
         set delivery_method = 'username'::public.delivery_method,
             delivery_username = $2,
             updated_at = now()
@@ -162,7 +163,7 @@ export class PostgresRequestsRepository implements RequestsRepository {
   async setInitiatorTimezone(requestId: string, timezone: string): Promise<void> {
     await this.db.query(
       `
-        UPDATE razreshenobot.requests
+        UPDATE ${campaignTable("requests")}
         SET initiator_timezone = $2,
             initiator_timezone_source = 'manual',
             updated_at = now()
@@ -175,7 +176,7 @@ export class PostgresRequestsRepository implements RequestsRepository {
   async setSelectedVariant(requestId: string, selectedVariantIdx: number): Promise<void> {
     await this.db.query(
       `
-        update razreshenobot.requests
+        update ${campaignTable("requests")}
         set selected_variant_idx = $2,
             updated_at = now()
         where id = $1::bigint;
@@ -187,7 +188,7 @@ export class PostgresRequestsRepository implements RequestsRepository {
   async updateRecipientName(requestId: string, recipientName: string): Promise<RequestRecord> {
     const result = await this.db.query<RequestRow>(
       `
-        update razreshenobot.requests
+        update ${campaignTable("requests")}
         set recipient_name = $2,
             updated_at = now()
         where id = $1::bigint

@@ -1,3 +1,4 @@
+import { currentCampaign } from "../../campaigns/current-campaign.js";
 import type { CreatePaymentInput, CreatePaymentResult, PaymentService } from "./payment-service.js";
 
 export class YookassaPaymentService implements PaymentService {
@@ -37,7 +38,7 @@ export class YookassaPaymentService implements PaymentService {
           },
           items: [
             {
-              description: "Электронная открытка (Бюро Разрешено)",
+              description: currentCampaign.brand.paymentItemDescription,
               quantity: "1.00",
               amount: {
                 value: input.tariff === "199" ? "199.00" : "149.00",

@@ -1,3 +1,8 @@
+import {
+  buildCampaignDocumentNumber,
+  buildCampaignDocumentSubtitle,
+  currentCampaign
+} from "../../campaigns/current-campaign.js";
 import type { DocumentsRepository } from "../documents/documents-repository.js";
 import type { DeliveriesRepository } from "../deliveries/deliveries-repository.js";
 import type { PaymentsRepository } from "./payments-repository.js";
@@ -63,17 +68,17 @@ export class YookassaWebhookService {
     const document = await this.documentsRepository.upsertDocument({
       initiatorName: "Инициатор",
       renderParams: {
-        doc_no: `0803-${requestId.padStart(3, "0")}`,
+        doc_no: buildCampaignDocumentNumber(requestId),
         delivery_method: request.deliveryMethod ?? "manual",
         delivery_username: request.deliveryUsername ?? null,
         initiator_name: "Инициатор",
         recipient_name: request.recipientName ?? "",
         request_id: requestId,
         selected_variant_idx: request.selectedVariantIdx ?? null,
-        templates_dir: "/mnt/razresheno/templates",
-        title: "РАЗРЕШЕНО",
-        subtitle: `ОФИЦИАЛЬНЫЙ ДОКУМЕНТ № 0803-${requestId.padStart(3, "0")}`,
-        qr_url: "https://t.me/razresheno_buro_bot"
+        templates_dir: currentCampaign.renderer.templatesDir,
+        title: currentCampaign.document.title,
+        subtitle: buildCampaignDocumentSubtitle(requestId),
+        qr_url: currentCampaign.telegram.qrUrl
       },
       requestId,
       tariff

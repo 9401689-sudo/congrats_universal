@@ -1,3 +1,4 @@
+import { campaignTable } from "../../campaigns/current-campaign.js";
 import type { PostgresExecutor } from "../../infra/postgres.js";
 import type { UserRecord } from "../../domain/user.js";
 import type { UsersRepository } from "./users-repository.js";
@@ -10,7 +11,7 @@ export class PostgresUsersRepository implements UsersRepository {
   async setTimezone(tgUserId: string, timezone: string): Promise<void> {
     await this.db.query(
       `
-        update razreshenobot.users
+        update ${campaignTable("users")}
         set timezone = $2,
             timezone_source = 'manual',
             timezone_updated_at = now(),
@@ -29,7 +30,7 @@ export class PostgresUsersRepository implements UsersRepository {
   }): Promise<UserRecord> {
     const result = await this.db.query<UpsertRow>(
       `
-        insert into razreshenobot.users (tg_user_id, first_seen_at, last_seen_at)
+        insert into ${campaignTable("users")} (tg_user_id, first_seen_at, last_seen_at)
         values ($1::bigint, now(), now())
         on conflict (tg_user_id)
         do update set last_seen_at = now()

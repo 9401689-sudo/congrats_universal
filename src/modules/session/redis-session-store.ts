@@ -5,13 +5,14 @@ import {
   type BotSession,
   type LegacyBotSession
 } from "../../domain/session.js";
+import { buildCampaignRedisSessionKey } from "../../campaigns/current-campaign.js";
 import type { SessionStore } from "./session-store.js";
 
 export class RedisSessionStore implements SessionStore {
   constructor(private readonly redis: RedisClient) {}
 
   async get(tgUserId: string): Promise<BotSession | null> {
-    const raw = await this.redis.get(`razresheno:sess:${tgUserId}`);
+    const raw = await this.redis.get(buildCampaignRedisSessionKey(tgUserId));
     if (!raw) {
       return null;
     }
@@ -22,7 +23,7 @@ export class RedisSessionStore implements SessionStore {
 
   async set(session: BotSession): Promise<void> {
     await this.redis.set(
-      `razresheno:sess:${session.tgUserId}`,
+      buildCampaignRedisSessionKey(session.tgUserId),
       JSON.stringify(toLegacySession(session)),
       "EX",
       86400

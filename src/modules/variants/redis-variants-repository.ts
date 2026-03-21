@@ -1,12 +1,13 @@
 import type { RedisClient } from "../../infra/redis.js";
 import type { VariantSnapshot } from "../../domain/variant.js";
+import { buildCampaignRedisVariantKey } from "../../campaigns/current-campaign.js";
 import type { VariantsRepository } from "./variants-repository.js";
 
 export class RedisVariantsRepository implements VariantsRepository {
   constructor(private readonly redis: RedisClient) {}
 
   async get(requestId: string, idx: number): Promise<VariantSnapshot | null> {
-    const raw = await this.redis.get(`razresheno:req:${requestId}:v:${idx}`);
+    const raw = await this.redis.get(buildCampaignRedisVariantKey(requestId, idx));
     if (!raw) {
       return null;
     }
@@ -16,7 +17,7 @@ export class RedisVariantsRepository implements VariantsRepository {
 
   async set(requestId: string, snapshot: VariantSnapshot): Promise<void> {
     await this.redis.set(
-      `razresheno:req:${requestId}:v:${snapshot.idx}`,
+      buildCampaignRedisVariantKey(requestId, snapshot.idx),
       JSON.stringify(snapshot),
       "EX",
       86400

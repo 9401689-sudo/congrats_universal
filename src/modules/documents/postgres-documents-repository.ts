@@ -1,3 +1,4 @@
+import { campaignTable } from "../../campaigns/current-campaign.js";
 import type { DocumentRecord } from "../../domain/document.js";
 import type { PostgresExecutor } from "../../infra/postgres.js";
 import type { DocumentsRepository } from "./documents-repository.js";
@@ -16,7 +17,7 @@ export class PostgresDocumentsRepository implements DocumentsRepository {
     const result = await this.db.query<DocumentRow>(
       `
         select id, request_id, tariff, final_file_id
-        from razreshenobot.documents
+        from ${campaignTable("documents")}
         where id = $1::bigint
         limit 1;
       `,
@@ -39,7 +40,7 @@ export class PostgresDocumentsRepository implements DocumentsRepository {
   async setFinalFileId(documentId: string, finalFileId: string): Promise<void> {
     await this.db.query(
       `
-        update razreshenobot.documents
+        update ${campaignTable("documents")}
         set final_file_id = $1
         where id = $2::bigint;
       `,
@@ -55,7 +56,7 @@ export class PostgresDocumentsRepository implements DocumentsRepository {
   }): Promise<DocumentRecord> {
     const result = await this.db.query<DocumentRow>(
       `
-        insert into razreshenobot.documents
+        insert into ${campaignTable("documents")}
           (request_id, tariff, initiator_name, render_params)
         values
           ($1::bigint, $2::public.document_tariff, $3, $4::jsonb)

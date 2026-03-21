@@ -1,3 +1,4 @@
+import { campaignTable } from "../../campaigns/current-campaign.js";
 import type { DeliveryContext, DeliveryRecord } from "../../domain/delivery.js";
 import type { PostgresExecutor } from "../../infra/postgres.js";
 import type { DeliveriesRepository } from "./deliveries-repository.js";
@@ -39,7 +40,7 @@ export class PostgresDeliveriesRepository implements DeliveriesRepository {
   }): Promise<DeliveryRecord> {
     const result = await this.db.query<DeliveryRow>(
       `
-        insert into razreshenobot.deliveries
+        insert into ${campaignTable("deliveries")}
           (document_id, scheduled_at, delivery_method, recipient_username)
         values
           ($1::bigint, $2::timestamptz, $3::public.delivery_method, $4)
@@ -80,12 +81,12 @@ export class PostgresDeliveriesRepository implements DeliveriesRepository {
           doc.render_params,
           doc.final_file_id,
           u.tg_user_id
-        from razreshenobot.deliveries d
-        join razreshenobot.documents doc
+        from ${campaignTable("deliveries")} d
+        join ${campaignTable("documents")} doc
           on doc.id = d.document_id
-        join razreshenobot.requests r
+        join ${campaignTable("requests")} r
           on r.id = doc.request_id
-        join razreshenobot.users u
+        join ${campaignTable("users")} u
           on u.id = r.user_id
         where d.id = $1::bigint
         limit 1;
@@ -113,7 +114,7 @@ export class PostgresDeliveriesRepository implements DeliveriesRepository {
     const result = await this.db.query<IdRow>(
       `
         SELECT id
-        FROM razreshenobot.deliveries
+        FROM ${campaignTable("deliveries")}
         WHERE status = 'scheduled'::public.delivery_status
           AND scheduled_at <= now()
           AND attempts < 5
@@ -130,7 +131,7 @@ export class PostgresDeliveriesRepository implements DeliveriesRepository {
   async markSent(deliveryId: string): Promise<void> {
     await this.db.query(
       `
-        update razreshenobot.deliveries
+        update ${campaignTable("deliveries")}
         set status = 'sent'::public.delivery_status,
             sent_at = now(),
             locked_at = null,
@@ -145,7 +146,7 @@ export class PostgresDeliveriesRepository implements DeliveriesRepository {
     const result = await this.db.query<LockRow>(
       `
         WITH upd AS (
-          UPDATE razreshenobot.deliveries
+          UPDATE ${campaignTable("deliveries")}
           SET locked_at = now(),
               lock_owner = $2
           WHERE id = $1::bigint
