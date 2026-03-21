@@ -1,6 +1,6 @@
 import "fastify";
 
-import type { ApplicationContext } from "../modules/app/create-application-context.js";
+import type { ApplicationContext } from "../engine/app/create-application-context.js";
 
 declare module "fastify" {
   interface FastifyInstance {

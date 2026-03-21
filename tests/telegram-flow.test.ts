@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
+import { TelegramApplicationService } from "../src/engine/app/telegram-application-service.js";
 import { normalizeTelegramUpdate } from "../src/engine/telegram/normalize-telegram-update.js";
-import { TelegramApplicationService } from "../src/modules/app/telegram-application-service.js";
 import { InMemoryUsersRepository } from "../src/modules/users/in-memory-users-repository.js";
 import { InMemoryRequestsRepository } from "../src/modules/requests/in-memory-requests-repository.js";
 import { InMemorySessionStore } from "../src/modules/session/in-memory-session-store.js";
