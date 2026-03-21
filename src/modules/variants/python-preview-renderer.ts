@@ -1,10 +1,7 @@
 import { mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
 
-import {
-  buildCampaignDocumentNumber,
-  currentCampaign
-} from "../../campaigns/current-campaign.js";
+import { buildCampaignRenderPayload } from "../../campaigns/current-campaign-renderer.js";
 import type { VariantSnapshot } from "../../domain/variant.js";
 import type { PythonRendererWorkerClient } from "../rendering/python-renderer-worker-client.js";
 import type { PreviewRenderer } from "./preview-renderer.js";
@@ -28,17 +25,18 @@ export class PythonPreviewRenderer implements PreviewRenderer {
     const renderedPath = path.join(previewsDir, `req${input.requestId}_v${input.variant.idx}.png`);
 
     const payload = {
+      ...buildCampaignRenderPayload({
+        intro: input.variant.content.intro,
+        outputPath: renderedPath,
+        points: input.variant.content.points,
+        recipientName: input.variant.recipientName,
+        requestId: input.requestId,
+        templatesDir: this.options.templatesDir
+      }),
       mode: "preview",
-      recipient_name: input.variant.recipientName,
       initiator_name: input.variant.initiatorName,
-      doc_no: buildCampaignDocumentNumber(input.requestId),
-      templates_dir: this.options.templatesDir ?? currentCampaign.renderer.templatesDir,
       bg: input.variant.bg,
-      intro: input.variant.content.intro,
-      points: input.variant.content.points,
       layout: input.variant.layout,
-      qr_url: currentCampaign.telegram.qrUrl,
-      output_path: renderedPath
     };
 
     await this.options.workerClient.render(payload);

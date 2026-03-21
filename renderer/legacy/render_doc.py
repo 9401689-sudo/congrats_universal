@@ -390,7 +390,7 @@ def normalize_input(inp: Dict[str, Any]) -> Dict[str, Any]:
         mode = "final" if is_final else "preview"
 
     assets = inp.get("assets") or {}
-    templ_dir = inp.get("templates_dir") or "/mnt/razresheno/templates"
+    templ_dir = inp.get("templates_dir") or "/mnt/templates"
 
     if "bg" not in assets:
         bg_file = inp.get("bg") or inp.get("background") or "bg1.png"
@@ -411,22 +411,22 @@ def normalize_input(inp: Dict[str, Any]) -> Dict[str, Any]:
     seal = layout.get("seal") or {}
     stamp = layout.get("stamp") or {}
 
-    out_path = inp.get("output_path") or inp.get("out_path") or "/tmp/razresheno_render.png"
+    out_path = inp.get("output_path") or inp.get("out_path") or "/tmp/render_doc.png"
 
     return {
         "mode": mode,
         "recipient_name": inp.get("recipient_name") or "",
         "initiator_name": inp.get("initiator_name") or "",
-        "doc_no": inp.get("doc_no") or inp.get("doc_number") or "0803-000",
-        "header_small": inp.get("header_small") or "Специальный выпуск к 8 марта\nРегламентирующая инстанция «РАЗРЕШЕНО»",
-        "title": inp.get("title") or "РАЗРЕШЕНО",
-        "subtitle": inp.get("subtitle") or f"ОФИЦИАЛЬНЫЙ ДОКУМЕНТ № {inp.get('doc_no') or inp.get('doc_number') or '0803-000'}",
-        "intro": inp.get("intro") or "Настоящим разрешается:",
+        "doc_no": inp.get("doc_no") or inp.get("doc_number") or "DOC-000",
+        "header_small": inp.get("header_small") or "Регламентирующая инстанция",
+        "title": inp.get("title") or "ДОКУМЕНТ",
+        "subtitle": inp.get("subtitle") or f"ОФИЦИАЛЬНЫЙ ДОКУМЕНТ № {inp.get('doc_no') or inp.get('doc_number') or 'DOC-000'}",
+        "intro": inp.get("intro") or "Настоящим подтверждается:",
         "points": inp.get("points") or [],
         "footer_lines": inp.get("footer_lines") or ["Вступает в силу немедленно.", "Обжалованию не подлежит."],
         "watermark_lines": inp.get("watermark_lines") or ["Предварительная версия.", "Не заверено."],
-        "source_line": inp.get("source_line") or "Источник оформления: razresheno",
-        "qr_url": inp.get("qr_url") or "https://t.me/razresheno_buro_bot?start=docqr",
+        "source_line": inp.get("source_line") or "Источник оформления",
+        "qr_url": inp.get("qr_url") or "https://t.me",
         "text_block_y": int(inp.get("text_block_y") or 760),
         "assets": assets,
         "seal": {
@@ -458,7 +458,7 @@ def render_doc(inp: Dict[str, Any]) -> str:
             raise FileNotFoundError(f"Asset not found: {k} -> {p}")
 
     # preload seal/stamp
-    templ_dir = inp.get("templates_dir") or "/mnt/razresheno/templates"
+    templ_dir = inp.get("templates_dir") or "/mnt/templates"
     preload_assets(templ_dir, assets)
 
     base = fit_background(open_image_rgba(assets["bg"]))

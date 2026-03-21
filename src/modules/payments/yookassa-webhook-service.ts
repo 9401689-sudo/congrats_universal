@@ -1,8 +1,8 @@
 import {
   buildCampaignDocumentNumber,
-  buildCampaignDocumentSubtitle,
   currentCampaign
 } from "../../campaigns/current-campaign.js";
+import { buildCampaignRenderPayload } from "../../campaigns/current-campaign-renderer.js";
 import {
   computeCampaignScheduledAt,
   currentCampaignRules,
@@ -73,17 +73,17 @@ export class YookassaWebhookService {
     const document = await this.documentsRepository.upsertDocument({
       initiatorName: "Инициатор",
       renderParams: {
-        doc_no: buildCampaignDocumentNumber(requestId),
+        ...buildCampaignRenderPayload({
+          requestId,
+          recipientName: request.recipientName ?? "",
+          templatesDir: currentCampaign.renderer.templatesDir
+        }),
         delivery_method: request.deliveryMethod ?? "manual",
         delivery_username: request.deliveryUsername ?? null,
         initiator_name: "Инициатор",
-        recipient_name: request.recipientName ?? "",
         request_id: requestId,
         selected_variant_idx: request.selectedVariantIdx ?? null,
-        templates_dir: currentCampaign.renderer.templatesDir,
-        title: currentCampaign.document.title,
-        subtitle: buildCampaignDocumentSubtitle(requestId),
-        qr_url: currentCampaign.telegram.qrUrl
+        doc_no: buildCampaignDocumentNumber(requestId)
       },
       requestId,
       tariff
