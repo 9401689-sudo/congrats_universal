@@ -1,6 +1,6 @@
 import type { FastifyBaseLogger } from "fastify";
 
-import type { DeliveryTransport } from "./delivery-transport.js";
+import type { DeliveryTransport } from "../../engine/delivery/delivery-transport.js";
 
 export class LoggingDeliveryTransport implements DeliveryTransport {
   constructor(private readonly logger: FastifyBaseLogger) {}

@@ -1,6 +1,6 @@
 import { openAsBlob } from "node:fs";
 
-import type { DeliveryTransport } from "./delivery-transport.js";
+import type { DeliveryTransport } from "../../engine/delivery/delivery-transport.js";
 
 export class BotApiDeliveryTransport implements DeliveryTransport {
   private readonly apiToken: string;

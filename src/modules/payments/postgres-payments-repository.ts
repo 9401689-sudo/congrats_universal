@@ -1,7 +1,7 @@
 import { campaignTable } from "../../campaigns/current-campaign.js";
 import type { PaymentRecord } from "../../domain/payment.js";
 import type { PostgresExecutor } from "../../infra/postgres.js";
-import type { PaymentsRepository } from "./payments-repository.js";
+import type { PaymentsRepository } from "../../engine/payments/payments-repository.js";
 
 type PaymentRow = {
   amount?: number;

@@ -1,4 +1,8 @@
-import type { CreatePaymentInput, CreatePaymentResult, PaymentService } from "./payment-service.js";
+import type {
+  CreatePaymentInput,
+  CreatePaymentResult,
+  PaymentService
+} from "../../engine/payments/payment-service.js";
 
 export class FakePaymentService implements PaymentService {
   async createPayment(input: CreatePaymentInput): Promise<CreatePaymentResult> {

@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 
-import { DeliveryWorkerService } from "../deliveries/delivery-worker-service.js";
+import { DeliveryWorkerService } from "../../engine/delivery/delivery-worker-service.js";
 
 export function registerInternalRoutes(app: FastifyInstance): void {
   app.get("/internal/state", async () => ({

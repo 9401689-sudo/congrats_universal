@@ -7,6 +7,9 @@ import { PythonRendererWorkerClient } from "../../engine/rendering/python-render
 import type { RenderingAdapter } from "../../engine/rendering/rendering-adapter.js";
 import type { SessionStore } from "../../engine/state/session-store.js";
 import type { TelegramGateway } from "../../engine/telegram/telegram-gateway.js";
+import type { DeliveryTransport } from "../../engine/delivery/delivery-transport.js";
+import type { PaymentService } from "../../engine/payments/payment-service.js";
+import type { PaymentsRepository } from "../../engine/payments/payments-repository.js";
 import { createPgPool } from "../../infra/postgres.js";
 import { createRedisClient, type RedisClient } from "../../infra/redis.js";
 import { InMemoryDocumentsRepository } from "../documents/in-memory-documents-repository.js";
@@ -19,15 +22,12 @@ import { LocalFileRenderingAdapter } from "../deliveries/local-file-rendering-ad
 import { LoggingDeliveryTransport } from "../deliveries/logging-delivery-transport.js";
 import { PostgresDeliveriesRepository } from "../deliveries/postgres-deliveries-repository.js";
 import { PythonRenderDocAdapter } from "../deliveries/python-render-doc-adapter.js";
-import type { DeliveryTransport } from "../deliveries/delivery-transport.js";
 import type { DeliveriesRepository } from "../deliveries/deliveries-repository.js";
 import { InMemoryRequestsRepository } from "../requests/in-memory-requests-repository.js";
 import { PostgresRequestsRepository } from "../requests/postgres-requests-repository.js";
 import type { RequestsRepository } from "../requests/requests-repository.js";
 import { FakePaymentService } from "../payments/fake-payment-service.js";
 import { InMemoryPaymentsRepository } from "../payments/in-memory-payments-repository.js";
-import type { PaymentService } from "../payments/payment-service.js";
-import type { PaymentsRepository } from "../payments/payments-repository.js";
 import { PostgresPaymentsRepository } from "../payments/postgres-payments-repository.js";
 import { YookassaPaymentService } from "../payments/yookassa-payment-service.js";
 import { createSessionStore } from "../session/create-session-store.js";

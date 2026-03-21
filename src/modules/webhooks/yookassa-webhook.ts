@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { YookassaWebhookService } from "../payments/yookassa-webhook-service.js";
+import { YookassaWebhookService } from "../../engine/payments/yookassa-webhook-service.js";
 
 export function registerYookassaWebhook(app: FastifyInstance): void {
   app.post("/webhooks/yookassa", async (request) => {

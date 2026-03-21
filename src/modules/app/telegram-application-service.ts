@@ -3,6 +3,8 @@ import { createEmptySession, type BotSession } from "../../domain/session.js";
 import type { PreviewRenderer } from "../../engine/rendering/preview-renderer.js";
 import type { SessionStore } from "../../engine/state/session-store.js";
 import type { TelegramGateway } from "../../engine/telegram/telegram-gateway.js";
+import type { PaymentService } from "../../engine/payments/payment-service.js";
+import type { PaymentsRepository } from "../../engine/payments/payments-repository.js";
 import {
   campaignTimezoneKeyboard,
   currentCampaignRules,
@@ -10,8 +12,6 @@ import {
   isCampaignTariff
 } from "../../campaigns/current-campaign-rules.js";
 import { currentCampaignTexts } from "../../campaigns/current-campaign-texts.js";
-import type { PaymentService } from "../payments/payment-service.js";
-import type { PaymentsRepository } from "../payments/payments-repository.js";
 import type { RequestsRepository } from "../requests/requests-repository.js";
 import type { UsersRepository } from "../users/users-repository.js";
 import type { VariantsRepository } from "../variants/variants-repository.js";

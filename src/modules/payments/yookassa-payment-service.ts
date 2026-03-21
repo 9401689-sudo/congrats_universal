@@ -1,5 +1,9 @@
 import { currentCampaign } from "../../campaigns/current-campaign.js";
-import type { CreatePaymentInput, CreatePaymentResult, PaymentService } from "./payment-service.js";
+import type {
+  CreatePaymentInput,
+  CreatePaymentResult,
+  PaymentService
+} from "../../engine/payments/payment-service.js";
 
 export class YookassaPaymentService implements PaymentService {
   constructor(

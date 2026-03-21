@@ -1,5 +1,5 @@
 import type { PaymentRecord } from "../../domain/payment.js";
-import type { PaymentsRepository } from "./payments-repository.js";
+import type { PaymentsRepository } from "../../engine/payments/payments-repository.js";
 
 export class InMemoryPaymentsRepository implements PaymentsRepository {
   private seq = 1;
