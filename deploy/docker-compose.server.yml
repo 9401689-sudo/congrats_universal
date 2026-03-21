@@ -1,14 +1,14 @@
 services:
-  congrats-app:
+  congrats-universal-app:
     build:
       context: ..
       dockerfile: Dockerfile
-    container_name: congrats-app
+    container_name: congrats-universal-app
     restart: unless-stopped
     env_file:
       - ../.env
     ports:
-      - "3000:3000"
+      - "3001:3001"
     volumes:
       - ../.local-renders:/app/.local-renders
       - /mnt/razresheno:/mnt/razresheno:ro
@@ -18,7 +18,7 @@ services:
       - default
       - supabase_default
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 30s
       timeout: 5s
       retries: 5

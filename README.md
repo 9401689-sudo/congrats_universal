@@ -20,6 +20,7 @@ Already implemented in code:
 
 1. Copy `.env.example` to `.env`
 2. Fill the values you actually have
+3. Set `CAMPAIGN_ID` to the campaign you want to run. Default: `march8-razresheno`
 3. Install dependencies:
 
 ```bash
@@ -36,6 +37,12 @@ npm run dev
 
 ```bash
 docker compose -f deploy/docker-compose.yml up -d --build
+```
+
+For parallel server deploy on `bot2.doorsvip.ru`, use:
+
+```bash
+docker compose -f deploy/docker-compose.server.yml up -d --build
 ```
 
 ## Useful Endpoints
@@ -59,6 +66,7 @@ npm test
 - If `TELEGRAM_BOT_TOKEN` is present, delivery worker can really send `sendDocument` to Telegram.
 - Final rendering for local runs writes a JSON artifact to `RENDER_OUTPUT_DIR`, which is enough to exercise the delivery path without SSH rendering.
 - If `PYTHON_RENDERER_BIN` and `PYTHON_RENDERER_SCRIPT_PATH` are set, the app uses the imported Python renderer from [render_doc.py](/C:/1_Work/Работа/Сайты/Боты/Congrats/renderer/legacy/render_doc.py).
+- For a safe parallel cutover, run this project on port `3001` and point `bot2.doorsvip.ru` to it first.
 
 ## Quick Local Flow
 
@@ -71,4 +79,4 @@ npm test
 ## Git / Deploy
 
 - Local git repository is initialized in this folder.
-- Deployment artifacts live in [deploy/docker-compose.yml](/C:/1_Work/Работа/Сайты/Боты/Congrats/deploy/docker-compose.yml) and [deploy/deploy-checklist.md](/C:/1_Work/Работа/Сайты/Боты/Congrats/deploy/deploy-checklist.md).
+- Deployment artifacts live in [deploy/docker-compose.yml](/C:/1_Work/Работа/Сайты/Боты/congrats_universal/deploy/docker-compose.yml), [deploy/docker-compose.server.yml](/C:/1_Work/Работа/Сайты/Боты/congrats_universal/deploy/docker-compose.server.yml) and [deploy/deploy-checklist.md](/C:/1_Work/Работа/Сайты/Боты/congrats_universal/deploy/deploy-checklist.md).
