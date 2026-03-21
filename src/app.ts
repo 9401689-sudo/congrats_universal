@@ -10,9 +10,21 @@ export function buildApp(config: AppConfig): FastifyInstance {
   const app = Fastify({
     logger: true
   });
-  const appContext = createApplicationContext(config, app.log);
+  const appContexts = Object.fromEntries(
+    Object.entries(config.botRuntimes).map(([botId, runtime]) => [
+      botId,
+      createApplicationContext(config, runtime, app.log)
+    ])
+  );
+  const appContext = appContexts[config.defaultBotId];
+
+  if (!appContext) {
+    throw new Error(`Default bot context not found: ${config.defaultBotId}`);
+  }
 
   app.decorate("appContext", appContext);
+  app.decorate("appContexts", appContexts);
+  app.decorate("defaultBotId", config.defaultBotId);
 
   app.get("/health", async () => ({
     ok: true,

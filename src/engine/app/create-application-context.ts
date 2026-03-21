@@ -1,7 +1,7 @@
 import type { FastifyBaseLogger } from "fastify";
 import type { Pool } from "pg";
 
-import type { AppConfig } from "../../config/env.js";
+import type { AppConfig, BotRuntimeConfig } from "../../config/env.js";
 import type { DeliveryTransport } from "../delivery/delivery-transport.js";
 import type { PaymentService } from "../payments/payment-service.js";
 import type { PaymentsRepository } from "../payments/payments-repository.js";
@@ -41,6 +41,10 @@ import { createVariantsRepository } from "../../adapters/variants/create-variant
 import { PythonPreviewRenderer } from "../../adapters/variants/python-preview-renderer.js";
 
 export type ApplicationContext = {
+  botRuntime: {
+    campaignId: string;
+    id: string;
+  };
   configSummary: {
     hasDatabase: boolean;
     hasRedis: boolean;
@@ -65,6 +69,7 @@ export type ApplicationContext = {
 
 export function createApplicationContext(
   config: AppConfig,
+  runtime: BotRuntimeConfig,
   logger: FastifyBaseLogger
 ): ApplicationContext {
   const pgPool = config.databaseUrl ? createPgPool(config.databaseUrl) : undefined;
@@ -87,11 +92,11 @@ export function createApplicationContext(
     ? new PostgresDeliveriesRepository(pgPool)
     : new InMemoryDeliveriesRepository();
 
-  const telegramGateway = config.telegramBotToken
-    ? new BotApiTelegramGateway(config.telegramBotToken)
+  const telegramGateway = runtime.telegramBotToken
+    ? new BotApiTelegramGateway(runtime.telegramBotToken)
     : new LoggingTelegramGateway(logger);
-  const deliveryTransport = config.telegramBotToken
-    ? new BotApiDeliveryTransport(config.telegramBotToken)
+  const deliveryTransport = runtime.telegramBotToken
+    ? new BotApiDeliveryTransport(runtime.telegramBotToken)
     : new LoggingDeliveryTransport(logger);
   const pythonRendererWorkerClient =
     config.pythonRendererBin && config.pythonRendererScriptPath
@@ -111,11 +116,11 @@ export function createApplicationContext(
         ? new LocalFileRenderingAdapter(config.renderOutputDir)
         : new FakeRenderingAdapter();
   const paymentService =
-    config.yookassaShopId && config.yookassaSecretKey && config.yookassaReturnUrl
+    runtime.yookassaShopId && runtime.yookassaSecretKey && runtime.yookassaReturnUrl
       ? new YookassaPaymentService(
-          config.yookassaShopId,
-          config.yookassaSecretKey,
-          config.yookassaReturnUrl
+          runtime.yookassaShopId,
+          runtime.yookassaSecretKey,
+          runtime.yookassaReturnUrl
         )
       : new FakePaymentService();
   const previewRenderer =
@@ -128,12 +133,16 @@ export function createApplicationContext(
       : undefined;
 
   return {
+    botRuntime: {
+      campaignId: runtime.campaignId,
+      id: runtime.id
+    },
     configSummary: {
       hasDatabase: Boolean(config.databaseUrl),
       hasRedis: Boolean(config.redisUrl),
-      hasTelegramBotToken: Boolean(config.telegramBotToken),
+      hasTelegramBotToken: Boolean(runtime.telegramBotToken),
       hasYookassa: Boolean(
-        config.yookassaShopId && config.yookassaSecretKey && config.yookassaReturnUrl
+        runtime.yookassaShopId && runtime.yookassaSecretKey && runtime.yookassaReturnUrl
       )
     },
     deliveryTransport,

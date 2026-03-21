@@ -7,6 +7,7 @@ export class LoggingTelegramGateway implements TelegramGateway {
 
   async sendMessage(input: {
     chatId: string;
+    preserveInlineKeyboard?: boolean;
     text: string;
     replyMarkup?: {
       inline_keyboard: Array<Array<{ callback_data?: string; text: string; url?: string }>>;

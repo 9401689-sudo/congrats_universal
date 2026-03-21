@@ -21,6 +21,7 @@ Already implemented in code:
 1. Copy `.env.example` to `.env`
 2. Fill the values you actually have
 3. Set `CAMPAIGN_ID` to the campaign you want to run. Default: `march8-razresheno`
+4. For future multi-bot runtime, you can keep using the single-bot env vars or provide `BOT_RUNTIMES_JSON`
 3. Install dependencies:
 
 ```bash
@@ -50,6 +51,7 @@ docker compose -f deploy/docker-compose.server.yml up -d --build
 - `GET /health`
 - `GET /internal/state`
 - `POST /webhooks/telegram`
+- `POST /webhooks/telegram/:botId`
 - `POST /webhooks/yookassa`
 - `POST /internal/deliveries/run-once`
 
@@ -67,6 +69,7 @@ npm test
 - Final rendering for local runs writes a JSON artifact to `RENDER_OUTPUT_DIR`, which is enough to exercise the delivery path without SSH rendering.
 - If `PYTHON_RENDERER_BIN` and `PYTHON_RENDERER_SCRIPT_PATH` are set, the app uses the imported Python renderer from [render_doc.py](/C:/1_Work/Работа/Сайты/Боты/Congrats/renderer/legacy/render_doc.py).
 - For a safe parallel cutover, run this project on port `3001` and point `bot2.doorsvip.ru` to it first.
+- The first multi-bot runtime layer is already present: one process can expose separate Telegram webhook paths per `botId`.
 
 ## Quick Local Flow
 

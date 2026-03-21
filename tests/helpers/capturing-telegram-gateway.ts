@@ -3,6 +3,7 @@ import type { TelegramGateway } from "../../src/engine/telegram/telegram-gateway
 export type SentTelegramMessage = {
   chatId: string;
   photoPath?: string;
+  preserveInlineKeyboard?: boolean;
   replyMarkup?: {
     inline_keyboard: Array<Array<{ callback_data?: string; text: string; url?: string }>>;
   };

@@ -1,6 +1,7 @@
 export interface TelegramGateway {
   sendMessage(input: {
     chatId: string;
+    preserveInlineKeyboard?: boolean;
     replyMarkup?: {
       inline_keyboard: Array<Array<{ callback_data?: string; text: string; url?: string }>>;
     };

@@ -1,8 +1,19 @@
 import { z } from "zod";
 
+const botRuntimeSchema = z.object({
+  campaignId: z.string().min(1),
+  id: z.string().min(1),
+  telegramBotToken: z.string().min(1).optional(),
+  yookassaReturnUrl: z.string().url().optional(),
+  yookassaSecretKey: z.string().min(1).optional(),
+  yookassaShopId: z.string().min(1).optional()
+});
+
 const envSchema = z.object({
+  BOT_RUNTIMES_JSON: z.string().min(1).optional(),
   CAMPAIGN_ID: z.string().min(1).default("march8-razresheno"),
   DATABASE_URL: z.string().min(1).optional(),
+  DEFAULT_BOT_ID: z.string().min(1).default("default"),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PYTHON_RENDERER_BIN: z.string().min(1).optional(),
   PYTHON_RENDERER_SCRIPT_PATH: z.string().min(1).optional(),
@@ -17,9 +28,19 @@ const envSchema = z.object({
   HOST: z.string().default("0.0.0.0")
 });
 
-export type AppConfig = {
+export type BotRuntimeConfig = {
   campaignId: string;
+  id: string;
+  telegramBotToken?: string;
+  yookassaReturnUrl?: string;
+  yookassaSecretKey?: string;
+  yookassaShopId?: string;
+};
+
+export type AppConfig = {
+  botRuntimes: Record<string, BotRuntimeConfig>;
   databaseUrl?: string;
+  defaultBotId: string;
   host: string;
   nodeEnv: "development" | "test" | "production";
   port: number;
@@ -34,12 +55,32 @@ export type AppConfig = {
   yookassaShopId?: string;
 };
 
-export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
-  const parsed = envSchema.parse(env);
+function parseBotRuntimes(env: z.infer<typeof envSchema>): Record<string, BotRuntimeConfig> {
+  if (env.BOT_RUNTIMES_JSON) {
+    const parsed = z.array(botRuntimeSchema).parse(JSON.parse(env.BOT_RUNTIMES_JSON));
+    return Object.fromEntries(parsed.map((runtime) => [runtime.id, runtime]));
+  }
 
   return {
-    campaignId: parsed.CAMPAIGN_ID,
+    [env.DEFAULT_BOT_ID]: {
+      campaignId: env.CAMPAIGN_ID,
+      id: env.DEFAULT_BOT_ID,
+      telegramBotToken: env.TELEGRAM_BOT_TOKEN,
+      yookassaReturnUrl: env.YOOKASSA_RETURN_URL,
+      yookassaSecretKey: env.YOOKASSA_SECRET_KEY,
+      yookassaShopId: env.YOOKASSA_SHOP_ID
+    }
+  };
+}
+
+export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
+  const parsed = envSchema.parse(env);
+  const botRuntimes = parseBotRuntimes(parsed);
+
+  return {
+    botRuntimes,
     databaseUrl: parsed.DATABASE_URL,
+    defaultBotId: parsed.DEFAULT_BOT_ID,
     host: parsed.HOST,
     nodeEnv: parsed.NODE_ENV,
     port: parsed.PORT,

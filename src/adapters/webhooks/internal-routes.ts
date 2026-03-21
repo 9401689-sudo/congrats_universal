@@ -5,6 +5,15 @@ import { DeliveryWorkerService } from "../../engine/delivery/delivery-worker-ser
 export function registerInternalRoutes(app: FastifyInstance): void {
   app.get("/internal/state", async () => ({
     env: app.appContext.configSummary,
+    runtimes: Object.fromEntries(
+      Object.entries(app.appContexts).map(([botId, context]) => [
+        botId,
+        {
+          botRuntime: context.botRuntime,
+          env: context.configSummary
+        }
+      ])
+    ),
     ok: true
   }));
 

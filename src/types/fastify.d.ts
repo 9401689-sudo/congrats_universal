@@ -5,5 +5,7 @@ import type { ApplicationContext } from "../engine/app/create-application-contex
 declare module "fastify" {
   interface FastifyInstance {
     appContext: ApplicationContext;
+    appContexts: Record<string, ApplicationContext>;
+    defaultBotId: string;
   }
 }
