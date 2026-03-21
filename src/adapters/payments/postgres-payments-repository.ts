@@ -1,4 +1,4 @@
-import { campaignTable } from "../../campaigns/current-campaign.js";
+import { campaignTable } from "../../campaigns/active-campaign.js";
 import type { PaymentRecord } from "../../domain/payment.js";
 import type { PostgresExecutor } from "../../infra/postgres.js";
 import type { PaymentsRepository } from "../../engine/payments/payments-repository.js";

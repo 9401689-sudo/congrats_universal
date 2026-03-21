@@ -1,4 +1,4 @@
-import { currentCampaign } from "../../campaigns/current-campaign.js";
+import { currentCampaign } from "../../campaigns/active-campaign.js";
 import type {
   CreatePaymentInput,
   CreatePaymentResult,

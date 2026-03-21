@@ -5,8 +5,8 @@ import {
   currentCampaignRules,
   getCampaignTariffAmount,
   isCampaignTariff
-} from "../../campaigns/current-campaign-rules.js";
-import { currentCampaignTexts } from "../../campaigns/current-campaign-texts.js";
+} from "../../campaigns/active-campaign.js";
+import { currentCampaignTexts } from "../../campaigns/active-campaign.js";
 import { handleBotEvent } from "../bot/handle-bot-event.js";
 import type { PaymentService } from "../payments/payment-service.js";
 import type { PaymentsRepository } from "../payments/payments-repository.js";

@@ -1,4 +1,4 @@
-import { campaignTable } from "../../campaigns/current-campaign.js";
+import { campaignTable } from "../../campaigns/active-campaign.js";
 import type { DocumentRecord } from "../../domain/document.js";
 import type { PostgresExecutor } from "../../infra/postgres.js";
 import type { DocumentsRepository } from "../../engine/repositories/documents-repository.js";

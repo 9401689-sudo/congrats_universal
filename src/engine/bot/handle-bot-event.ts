@@ -1,6 +1,6 @@
 import type { NormalizedTelegramEvent } from "../../domain/events.js";
 import type { BotSession } from "../../domain/session.js";
-import { currentCampaignTexts } from "../../campaigns/current-campaign-texts.js";
+import { currentCampaignTexts } from "../../campaigns/active-campaign.js";
 import { routeTelegramEvent } from "./telegram-router.js";
 
 export type BotEffect =

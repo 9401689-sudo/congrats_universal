@@ -1,7 +1,7 @@
 import { mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
 
-import { buildCampaignRenderPayload } from "../../campaigns/current-campaign-renderer.js";
+import { buildCampaignRenderPayload } from "../../campaigns/active-campaign.js";
 import type { PreviewRenderer } from "../../engine/rendering/preview-renderer.js";
 import type { PythonRendererWorkerClient } from "../../engine/rendering/python-renderer-worker-client.js";
 import type { VariantSnapshot } from "../../domain/variant.js";

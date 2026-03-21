@@ -1,4 +1,4 @@
-import { campaignTable } from "../../campaigns/current-campaign.js";
+import { campaignTable } from "../../campaigns/active-campaign.js";
 import type { DeliveryContext, DeliveryRecord } from "../../domain/delivery.js";
 import type { PostgresExecutor } from "../../infra/postgres.js";
 import type { DeliveriesRepository } from "../../engine/repositories/deliveries-repository.js";

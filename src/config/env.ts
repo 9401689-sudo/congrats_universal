@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 const envSchema = z.object({
+  CAMPAIGN_ID: z.string().min(1).default("march8-razresheno"),
   DATABASE_URL: z.string().min(1).optional(),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PYTHON_RENDERER_BIN: z.string().min(1).optional(),
@@ -17,6 +18,7 @@ const envSchema = z.object({
 });
 
 export type AppConfig = {
+  campaignId: string;
   databaseUrl?: string;
   host: string;
   nodeEnv: "development" | "test" | "production";
@@ -36,6 +38,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const parsed = envSchema.parse(env);
 
   return {
+    campaignId: parsed.CAMPAIGN_ID,
     databaseUrl: parsed.DATABASE_URL,
     host: parsed.HOST,
     nodeEnv: parsed.NODE_ENV,

@@ -1,8 +1,7 @@
 import type { BotSession } from "../../domain/session.js";
 import type { RequestRecord } from "../../domain/request.js";
 import type { VariantSnapshot } from "../../domain/variant.js";
-import { currentCampaign } from "../../campaigns/current-campaign.js";
-import { currentCampaignVariants } from "../../campaigns/current-campaign-variants.js";
+import { currentCampaign, currentCampaignVariants } from "../../campaigns/active-campaign.js";
 export function buildPreviewVariant(input: {
   request: RequestRecord;
   session: BotSession;

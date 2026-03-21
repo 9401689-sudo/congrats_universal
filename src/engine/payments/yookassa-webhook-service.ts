@@ -1,13 +1,13 @@
 import {
   buildCampaignDocumentNumber,
   currentCampaign
-} from "../../campaigns/current-campaign.js";
-import { buildCampaignRenderPayload } from "../../campaigns/current-campaign-renderer.js";
+} from "../../campaigns/active-campaign.js";
+import { buildCampaignRenderPayload } from "../../campaigns/active-campaign.js";
 import {
   computeCampaignScheduledAt,
   currentCampaignRules,
   isCampaignTariff
-} from "../../campaigns/current-campaign-rules.js";
+} from "../../campaigns/active-campaign.js";
 import type { PaymentsRepository } from "./payments-repository.js";
 import type { DeliveriesRepository } from "../repositories/deliveries-repository.js";
 import type { DocumentsRepository } from "../repositories/documents-repository.js";
