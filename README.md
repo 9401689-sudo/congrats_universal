@@ -65,6 +65,7 @@ npm test
 
 - If `DATABASE_URL` or `REDIS_URL` are missing, the app falls back to in-memory repositories for many flows.
 - If YooKassa credentials are missing, payment creation uses a fake service and still lets you exercise the bot flow locally.
+- `YOOKASSA_RETURN_URL` should point back to the bot entry URL, for example `https://t.me/<bot_username>`. If it is omitted, the service falls back to the active campaign Telegram URL.
 - If `TELEGRAM_BOT_TOKEN` is present, delivery worker can really send `sendDocument` to Telegram.
 - Final rendering for local runs writes a JSON artifact to `RENDER_OUTPUT_DIR`, which is enough to exercise the delivery path without SSH rendering.
 - If `PYTHON_RENDERER_BIN` and `PYTHON_RENDERER_SCRIPT_PATH` are set, the app uses the imported Python renderer from [render_doc.py](/C:/1_Work/Работа/Сайты/Боты/Congrats/renderer/legacy/render_doc.py).

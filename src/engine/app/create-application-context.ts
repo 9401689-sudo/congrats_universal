@@ -116,7 +116,7 @@ export function createApplicationContext(
         ? new LocalFileRenderingAdapter(config.renderOutputDir)
         : new FakeRenderingAdapter();
   const paymentService =
-    runtime.yookassaShopId && runtime.yookassaSecretKey && runtime.yookassaReturnUrl
+    runtime.yookassaShopId && runtime.yookassaSecretKey
       ? new YookassaPaymentService(
           runtime.yookassaShopId,
           runtime.yookassaSecretKey,
@@ -142,7 +142,7 @@ export function createApplicationContext(
       hasRedis: Boolean(config.redisUrl),
       hasTelegramBotToken: Boolean(runtime.telegramBotToken),
       hasYookassa: Boolean(
-        runtime.yookassaShopId && runtime.yookassaSecretKey && runtime.yookassaReturnUrl
+        runtime.yookassaShopId && runtime.yookassaSecretKey
       )
     },
     deliveryTransport,

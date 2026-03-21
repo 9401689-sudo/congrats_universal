@@ -9,10 +9,12 @@ export class YookassaPaymentService implements PaymentService {
   constructor(
     private readonly shopId: string,
     private readonly secretKey: string,
-    private readonly returnUrl: string
+    private readonly returnUrl?: string
   ) {}
 
   async createPayment(input: CreatePaymentInput): Promise<CreatePaymentResult> {
+    const returnUrl = this.returnUrl ?? currentCampaign.telegram.qrUrl;
+
     const response = await fetch("https://api.yookassa.ru/v3/payments", {
       method: "POST",
       headers: {
@@ -28,7 +30,7 @@ export class YookassaPaymentService implements PaymentService {
         capture: true,
         confirmation: {
           type: "redirect",
-          return_url: this.returnUrl
+          return_url: returnUrl
         },
         description: `Электронная открытка №${input.requestId}`,
         metadata: {
