@@ -1,5 +1,5 @@
 import type { UserRecord } from "../../domain/user.js";
-import type { UsersRepository } from "./users-repository.js";
+import type { UsersRepository } from "../../engine/repositories/users-repository.js";
 
 export class InMemoryUsersRepository implements UsersRepository {
   private seq = 1;

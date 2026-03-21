@@ -1,5 +1,5 @@
 import type { VariantSnapshot } from "../../domain/variant.js";
-import type { VariantsRepository } from "./variants-repository.js";
+import type { VariantsRepository } from "../../engine/repositories/variants-repository.js";
 
 export class InMemoryVariantsRepository implements VariantsRepository {
   private readonly store = new Map<string, VariantSnapshot>();

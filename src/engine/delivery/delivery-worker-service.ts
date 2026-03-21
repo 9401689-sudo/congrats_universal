@@ -1,8 +1,8 @@
-import type { DocumentsRepository } from "../../modules/documents/documents-repository.js";
-import type { RequestsRepository } from "../../modules/requests/requests-repository.js";
 import type { RenderingAdapter } from "../rendering/rendering-adapter.js";
-import type { DeliveriesRepository } from "../../modules/deliveries/deliveries-repository.js";
 import type { DeliveryTransport } from "./delivery-transport.js";
+import type { DeliveriesRepository } from "../repositories/deliveries-repository.js";
+import type { DocumentsRepository } from "../repositories/documents-repository.js";
+import type { RequestsRepository } from "../repositories/requests-repository.js";
 
 export class DeliveryWorkerService {
   constructor(

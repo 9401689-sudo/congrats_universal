@@ -1,7 +1,7 @@
 import { campaignTable } from "../../campaigns/current-campaign.js";
 import type { DocumentRecord } from "../../domain/document.js";
 import type { PostgresExecutor } from "../../infra/postgres.js";
-import type { DocumentsRepository } from "./documents-repository.js";
+import type { DocumentsRepository } from "../../engine/repositories/documents-repository.js";
 
 type DocumentRow = {
   final_file_id?: string | null;

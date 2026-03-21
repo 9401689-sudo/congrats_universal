@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { DeliveryWorkerService } from "../src/engine/delivery/delivery-worker-service.js";
 import type { DeliveryTransport } from "../src/engine/delivery/delivery-transport.js";
 import type { RenderingAdapter } from "../src/engine/rendering/rendering-adapter.js";
-import type { DeliveriesRepository } from "../src/modules/deliveries/deliveries-repository.js";
+import type { DeliveriesRepository } from "../src/engine/repositories/deliveries-repository.js";
 import { InMemoryDocumentsRepository } from "../src/modules/documents/in-memory-documents-repository.js";
 import { InMemoryRequestsRepository } from "../src/modules/requests/in-memory-requests-repository.js";
 

@@ -10,15 +10,15 @@ import { currentCampaignTexts } from "../../campaigns/current-campaign-texts.js"
 import { handleBotEvent } from "../bot/handle-bot-event.js";
 import type { PaymentService } from "../payments/payment-service.js";
 import type { PaymentsRepository } from "../payments/payments-repository.js";
+import type { RequestsRepository } from "../repositories/requests-repository.js";
+import type { UsersRepository } from "../repositories/users-repository.js";
+import type { VariantsRepository } from "../repositories/variants-repository.js";
 import type { PreviewRenderer } from "../rendering/preview-renderer.js";
 import type { SessionStore } from "../state/session-store.js";
 import type { TelegramGateway } from "../telegram/telegram-gateway.js";
 import { InMemoryRequestsRepository } from "../../modules/requests/in-memory-requests-repository.js";
-import type { RequestsRepository } from "../../modules/requests/requests-repository.js";
 import { InMemoryUsersRepository } from "../../modules/users/in-memory-users-repository.js";
-import type { UsersRepository } from "../../modules/users/users-repository.js";
 import { buildPreviewVariant } from "../../modules/variants/preview-builder.js";
-import type { VariantsRepository } from "../../modules/variants/variants-repository.js";
 
 export class TelegramApplicationService {
   private static readonly START_CHAT_CLEANUP_WINDOW = 200;

@@ -1,7 +1,7 @@
 import { campaignTable } from "../../campaigns/current-campaign.js";
 import type { RequestRecord } from "../../domain/request.js";
 import type { PostgresExecutor } from "../../infra/postgres.js";
-import type { RequestsRepository } from "./requests-repository.js";
+import type { RequestsRepository } from "../../engine/repositories/requests-repository.js";
 
 type RequestRow = {
   delivery_method?: "manual" | "username" | null;

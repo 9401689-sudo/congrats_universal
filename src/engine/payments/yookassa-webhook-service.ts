@@ -8,10 +8,10 @@ import {
   currentCampaignRules,
   isCampaignTariff
 } from "../../campaigns/current-campaign-rules.js";
-import type { DocumentsRepository } from "../../modules/documents/documents-repository.js";
-import type { DeliveriesRepository } from "../../modules/deliveries/deliveries-repository.js";
 import type { PaymentsRepository } from "./payments-repository.js";
-import type { RequestsRepository } from "../../modules/requests/requests-repository.js";
+import type { DeliveriesRepository } from "../repositories/deliveries-repository.js";
+import type { DocumentsRepository } from "../repositories/documents-repository.js";
+import type { RequestsRepository } from "../repositories/requests-repository.js";
 
 type YookassaWebhookBody = {
   event?: string;

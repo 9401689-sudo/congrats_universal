@@ -1,5 +1,5 @@
 import type { RequestRecord } from "../../domain/request.js";
-import type { RequestsRepository } from "./requests-repository.js";
+import type { RequestsRepository } from "../../engine/repositories/requests-repository.js";
 
 export class InMemoryRequestsRepository implements RequestsRepository {
   private seq = 1;

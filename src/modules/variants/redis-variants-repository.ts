@@ -1,7 +1,7 @@
 import type { RedisClient } from "../../infra/redis.js";
 import type { VariantSnapshot } from "../../domain/variant.js";
 import { buildCampaignRedisVariantKey } from "../../campaigns/current-campaign.js";
-import type { VariantsRepository } from "./variants-repository.js";
+import type { VariantsRepository } from "../../engine/repositories/variants-repository.js";
 
 export class RedisVariantsRepository implements VariantsRepository {
   constructor(private readonly redis: RedisClient) {}

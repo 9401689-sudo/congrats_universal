@@ -1,5 +1,5 @@
 import type { DocumentRecord } from "../../domain/document.js";
-import type { DocumentsRepository } from "./documents-repository.js";
+import type { DocumentsRepository } from "../../engine/repositories/documents-repository.js";
 
 export class InMemoryDocumentsRepository implements DocumentsRepository {
   private seq = 1;

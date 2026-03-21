@@ -1,5 +1,5 @@
 import type { DeliveryContext, DeliveryRecord } from "../../domain/delivery.js";
-import type { DeliveriesRepository } from "./deliveries-repository.js";
+import type { DeliveriesRepository } from "../../engine/repositories/deliveries-repository.js";
 
 export class InMemoryDeliveriesRepository implements DeliveriesRepository {
   private seq = 1;

@@ -5,6 +5,11 @@ import type { AppConfig } from "../../config/env.js";
 import type { DeliveryTransport } from "../delivery/delivery-transport.js";
 import type { PaymentService } from "../payments/payment-service.js";
 import type { PaymentsRepository } from "../payments/payments-repository.js";
+import type { DeliveriesRepository } from "../repositories/deliveries-repository.js";
+import type { DocumentsRepository } from "../repositories/documents-repository.js";
+import type { RequestsRepository } from "../repositories/requests-repository.js";
+import type { UsersRepository } from "../repositories/users-repository.js";
+import type { VariantsRepository } from "../repositories/variants-repository.js";
 import type { PreviewRenderer } from "../rendering/preview-renderer.js";
 import { PythonRendererWorkerClient } from "../rendering/python-renderer-worker-client.js";
 import type { RenderingAdapter } from "../rendering/rendering-adapter.js";
@@ -14,7 +19,6 @@ import { createPgPool } from "../../infra/postgres.js";
 import { createRedisClient, type RedisClient } from "../../infra/redis.js";
 import { InMemoryDocumentsRepository } from "../../modules/documents/in-memory-documents-repository.js";
 import { PostgresDocumentsRepository } from "../../modules/documents/postgres-documents-repository.js";
-import type { DocumentsRepository } from "../../modules/documents/documents-repository.js";
 import { BotApiDeliveryTransport } from "../../modules/deliveries/bot-api-delivery-transport.js";
 import { FakeRenderingAdapter } from "../../modules/deliveries/fake-rendering-adapter.js";
 import { InMemoryDeliveriesRepository } from "../../modules/deliveries/in-memory-deliveries-repository.js";
@@ -22,23 +26,19 @@ import { LocalFileRenderingAdapter } from "../../modules/deliveries/local-file-r
 import { LoggingDeliveryTransport } from "../../modules/deliveries/logging-delivery-transport.js";
 import { PostgresDeliveriesRepository } from "../../modules/deliveries/postgres-deliveries-repository.js";
 import { PythonRenderDocAdapter } from "../../modules/deliveries/python-render-doc-adapter.js";
-import type { DeliveriesRepository } from "../../modules/deliveries/deliveries-repository.js";
 import { FakePaymentService } from "../../modules/payments/fake-payment-service.js";
 import { InMemoryPaymentsRepository } from "../../modules/payments/in-memory-payments-repository.js";
 import { PostgresPaymentsRepository } from "../../modules/payments/postgres-payments-repository.js";
 import { YookassaPaymentService } from "../../modules/payments/yookassa-payment-service.js";
 import { InMemoryRequestsRepository } from "../../modules/requests/in-memory-requests-repository.js";
 import { PostgresRequestsRepository } from "../../modules/requests/postgres-requests-repository.js";
-import type { RequestsRepository } from "../../modules/requests/requests-repository.js";
 import { createSessionStore } from "../../modules/session/create-session-store.js";
 import { BotApiTelegramGateway } from "../../modules/telegram/bot-api-telegram-gateway.js";
 import { LoggingTelegramGateway } from "../../modules/telegram/logging-telegram-gateway.js";
 import { InMemoryUsersRepository } from "../../modules/users/in-memory-users-repository.js";
 import { PostgresUsersRepository } from "../../modules/users/postgres-users-repository.js";
-import type { UsersRepository } from "../../modules/users/users-repository.js";
 import { createVariantsRepository } from "../../modules/variants/create-variants-repository.js";
 import { PythonPreviewRenderer } from "../../modules/variants/python-preview-renderer.js";
-import type { VariantsRepository } from "../../modules/variants/variants-repository.js";
 
 export type ApplicationContext = {
   configSummary: {
