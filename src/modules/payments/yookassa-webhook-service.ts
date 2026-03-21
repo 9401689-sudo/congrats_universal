@@ -3,6 +3,11 @@ import {
   buildCampaignDocumentSubtitle,
   currentCampaign
 } from "../../campaigns/current-campaign.js";
+import {
+  computeCampaignScheduledAt,
+  currentCampaignRules,
+  isCampaignTariff
+} from "../../campaigns/current-campaign-rules.js";
 import type { DocumentsRepository } from "../documents/documents-repository.js";
 import type { DeliveriesRepository } from "../deliveries/deliveries-repository.js";
 import type { PaymentsRepository } from "./payments-repository.js";
@@ -47,7 +52,7 @@ export class YookassaWebhookService {
 
     const requestId = String(body.object?.metadata?.request_id ?? "");
     const tgUserId = String(body.object?.metadata?.tg_user_id ?? "");
-    const tariff = body.object?.metadata?.tariff === "149" ? "149" : "199";
+    const tariff = isCampaignTariff(body.object?.metadata?.tariff) ? body.object?.metadata?.tariff : "199";
 
     if (!requestId || !tgUserId) {
       return { ok: true };
@@ -94,30 +99,11 @@ export class YookassaWebhookService {
       deliveryMethod: request.deliveryMethod ?? "manual",
       documentId: document.id,
       recipientUsername: request.deliveryUsername ?? null,
-      scheduledAt: computeScheduledAt(request.initiatorTimezone ?? "Europe/Moscow")
+      scheduledAt: computeCampaignScheduledAt(
+        request.initiatorTimezone ?? currentCampaignRules.defaultDeliveryTimezone
+      )
     });
     await this.requestsRepository.closeOpenRequest(requestId);
     return { ok: true };
   }
-}
-
-function computeScheduledAt(timezone: string): string {
-  const offsets: Record<string, number> = {
-    "Asia/Irkutsk": 8,
-    "Asia/Krasnoyarsk": 7,
-    "Asia/Omsk": 6,
-    "Asia/Vladivostok": 10,
-    "Asia/Yakutsk": 9,
-    "Asia/Yekaterinburg": 5,
-    "Europe/Moscow": 3
-  };
-
-  const offset = offsets[timezone] ?? 3;
-  const now = new Date();
-  const targetYear =
-    now.getUTCMonth() > 2 || (now.getUTCMonth() === 2 && now.getUTCDate() > 8)
-      ? now.getUTCFullYear() + 1
-      : now.getUTCFullYear();
-
-  return new Date(Date.UTC(targetYear, 2, 8, 9 - offset, 0, 0)).toISOString();
 }

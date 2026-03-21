@@ -1,5 +1,11 @@
 import type { NormalizedTelegramEvent } from "../../domain/events.js";
 import { createEmptySession, type BotSession } from "../../domain/session.js";
+import {
+  campaignTimezoneKeyboard,
+  currentCampaignRules,
+  getCampaignTariffAmount,
+  isCampaignTariff
+} from "../../campaigns/current-campaign-rules.js";
 import { currentCampaignTexts } from "../../campaigns/current-campaign-texts.js";
 import type { PaymentService } from "../payments/payment-service.js";
 import type { PaymentsRepository } from "../payments/payments-repository.js";
@@ -494,40 +500,14 @@ export class TelegramApplicationService {
           return session;
         }
 
-        const tariff =
-          payload.tariff === "149" || payload.tariff === "199"
-            ? payload.tariff
-            : session.tariffPending;
+        const tariff = isCampaignTariff(payload.tariff) ? payload.tariff : session.tariffPending;
 
-        if (tariff === "199" && !request.initiatorTimezone) {
+        if (tariff && currentCampaignRules.tariffs[tariff].requiresTimezone && !request.initiatorTimezone) {
           await this.telegramGateway.sendMessage({
             chatId: event.chatId ?? session.chatId ?? session.tgUserId,
             text: currentCampaignTexts.prompts.chooseTimezone,
             replyMarkup: {
-              inline_keyboard: [
-                [{ text: "MSK (UTC+3)", callback_data: "TZ:Europe/Moscow" }],
-                [
-                  {
-                    text: "Екатеринбург (UTC+5)",
-                    callback_data: "TZ:Asia/Yekaterinburg"
-                  },
-                  { text: "Омск (UTC+6)", callback_data: "TZ:Asia/Omsk" }
-                ],
-                [
-                  {
-                    text: "Красноярск (UTC+7)",
-                    callback_data: "TZ:Asia/Krasnoyarsk"
-                  },
-                  { text: "Иркутск (UTC+8)", callback_data: "TZ:Asia/Irkutsk" }
-                ],
-                [
-                  { text: "Якутск (UTC+9)", callback_data: "TZ:Asia/Yakutsk" },
-                  {
-                    text: "Владивосток (UTC+10)",
-                    callback_data: "TZ:Asia/Vladivostok"
-                  }
-                ]
-              ]
+              inline_keyboard: campaignTimezoneKeyboard()
             }
           });
 
@@ -541,7 +521,11 @@ export class TelegramApplicationService {
         const hasRequestScopedDeliveryChoice =
           session.deliveryMethodRequestId === session.activeRequestId;
 
-        if (tariff === "199" && !hasRequestScopedDeliveryChoice) {
+        if (
+          tariff &&
+          currentCampaignRules.tariffs[tariff].requiresDeliveryChoice &&
+          !hasRequestScopedDeliveryChoice
+        ) {
           await this.telegramGateway.sendMessage({
             chatId: event.chatId ?? session.chatId ?? session.tgUserId,
             text: currentCampaignTexts.prompts.chooseDeliveryMethod,
@@ -593,7 +577,7 @@ export class TelegramApplicationService {
         });
 
         await this.paymentsRepository.insertPendingPayment({
-          amount: tariff === "149" ? 149 : 199,
+          amount: getCampaignTariffAmount(tariff),
           idempotenceKey: payment.idempotenceKey,
           payload: {
             provider: "yookassa",
