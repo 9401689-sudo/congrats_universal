@@ -86,6 +86,25 @@ To make a campaign available to the app:
 3. Register it in [campaign-registry.ts](/C:/1_Work/Работа/Сайты/Боты/congrats_universal/src/campaigns/campaign-registry.ts)
 4. Point a bot runtime at it via `campaignId`
 
+## Scaffold Command
+
+You can create a new campaign skeleton with:
+
+```bash
+npm run make:campaign -- birthday-classic
+```
+
+This creates:
+
+- `src/campaigns/birthday-classic/config.ts`
+- `src/campaigns/birthday-classic/texts.ts`
+- `src/campaigns/birthday-classic/rules.ts`
+- `src/campaigns/birthday-classic/variants.ts`
+- `src/campaigns/birthday-classic/renderer.ts`
+- `src/campaigns/birthday-classic/index.ts`
+
+The scaffold does not auto-register the campaign on purpose. That final step stays explicit so you can review names, copy, and runtime mapping before wiring it into the app.
+
 ## Runtime Wiring
 
 Single-bot mode still works through:

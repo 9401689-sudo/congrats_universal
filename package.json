@@ -12,7 +12,8 @@
     "start": "node --enable-source-maps dist/index.js",
     "build": "tsc -p tsconfig.json",
     "check": "tsc --noEmit -p tsconfig.json",
-    "test": "node --import tsx --test tests/**/*.test.ts"
+    "test": "node --import tsx --test tests/**/*.test.ts",
+    "make:campaign": "tsx scripts/make-campaign.ts"
   },
   "dependencies": {
     "fastify": "^5.2.1",

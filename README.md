@@ -61,6 +61,12 @@ docker compose -f deploy/docker-compose.server.yml up -d --build
 npm test
 ```
 
+## Campaign Scaffold
+
+```bash
+npm run make:campaign -- birthday-classic
+```
+
 ## Notes
 
 - If `DATABASE_URL` or `REDIS_URL` are missing, the app falls back to in-memory repositories for many flows.
