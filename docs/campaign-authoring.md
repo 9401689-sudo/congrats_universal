@@ -22,6 +22,21 @@ The engine continues to own:
 - rendering pipeline execution
 - shared adapters and repositories
 
+## Campaign Vs Bot Runtime
+
+These are now treated as different layers:
+
+- `campaign`
+  Describes the product itself: texts, branding, rules, render defaults, and content packs.
+- `bot runtime`
+  Describes how a campaign is published: Telegram token, YooKassa credentials, return URL, and runtime id.
+
+This distinction matters because later we may want:
+
+- several branded bots pointing at different campaigns
+- several branded bots pointing at the same campaign
+- one hub bot that routes users into campaign-specific bots
+
 ## Target Folder Shape
 
 Each campaign should live in its own folder:
@@ -100,6 +115,10 @@ Example:
   }
 ]
 ```
+
+The runtime contract now lives in:
+
+- [bot-runtime-definition.ts](/C:/1_Work/Работа/Сайты/Боты/congrats_universal/src/engine/runtime/bot-runtime-definition.ts)
 
 ## Before Creating The Next Campaign
 

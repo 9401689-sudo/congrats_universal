@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { BotRuntimeDefinition } from "../engine/runtime/bot-runtime-definition.js";
 
 const botRuntimeSchema = z.object({
   campaignId: z.string().min(1),
@@ -28,17 +29,8 @@ const envSchema = z.object({
   HOST: z.string().default("0.0.0.0")
 });
 
-export type BotRuntimeConfig = {
-  campaignId: string;
-  id: string;
-  telegramBotToken?: string;
-  yookassaReturnUrl?: string;
-  yookassaSecretKey?: string;
-  yookassaShopId?: string;
-};
-
 export type AppConfig = {
-  botRuntimes: Record<string, BotRuntimeConfig>;
+  botRuntimes: Record<string, BotRuntimeDefinition>;
   databaseUrl?: string;
   defaultBotId: string;
   host: string;
@@ -49,13 +41,9 @@ export type AppConfig = {
   pythonRendererTemplatesDir?: string;
   redisUrl?: string;
   renderOutputDir: string;
-  telegramBotToken?: string;
-  yookassaReturnUrl?: string;
-  yookassaSecretKey?: string;
-  yookassaShopId?: string;
 };
 
-function parseBotRuntimes(env: z.infer<typeof envSchema>): Record<string, BotRuntimeConfig> {
+function parseBotRuntimes(env: z.infer<typeof envSchema>): Record<string, BotRuntimeDefinition> {
   if (env.BOT_RUNTIMES_JSON) {
     const parsed = z.array(botRuntimeSchema).parse(JSON.parse(env.BOT_RUNTIMES_JSON));
     return Object.fromEntries(parsed.map((runtime) => [runtime.id, runtime]));
@@ -88,10 +76,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     pythonRendererScriptPath: parsed.PYTHON_RENDERER_SCRIPT_PATH,
     pythonRendererTemplatesDir: parsed.PYTHON_RENDERER_TEMPLATES_DIR,
     redisUrl: parsed.REDIS_URL,
-    renderOutputDir: parsed.RENDER_OUTPUT_DIR,
-    telegramBotToken: parsed.TELEGRAM_BOT_TOKEN,
-    yookassaReturnUrl: parsed.YOOKASSA_RETURN_URL,
-    yookassaSecretKey: parsed.YOOKASSA_SECRET_KEY,
-    yookassaShopId: parsed.YOOKASSA_SHOP_ID
+    renderOutputDir: parsed.RENDER_OUTPUT_DIR
   };
 }

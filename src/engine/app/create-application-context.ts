@@ -1,7 +1,7 @@
 import type { FastifyBaseLogger } from "fastify";
 import type { Pool } from "pg";
 
-import type { AppConfig, BotRuntimeConfig } from "../../config/env.js";
+import type { AppConfig } from "../../config/env.js";
 import type { DeliveryTransport } from "../delivery/delivery-transport.js";
 import type { PaymentService } from "../payments/payment-service.js";
 import type { PaymentsRepository } from "../payments/payments-repository.js";
@@ -13,6 +13,7 @@ import type { VariantsRepository } from "../repositories/variants-repository.js"
 import type { PreviewRenderer } from "../rendering/preview-renderer.js";
 import { PythonRendererWorkerClient } from "../rendering/python-renderer-worker-client.js";
 import type { RenderingAdapter } from "../rendering/rendering-adapter.js";
+import type { BotRuntimeDefinition } from "../runtime/bot-runtime-definition.js";
 import type { SessionStore } from "../state/session-store.js";
 import type { TelegramGateway } from "../telegram/telegram-gateway.js";
 import { createPgPool } from "../../infra/postgres.js";
@@ -69,7 +70,7 @@ export type ApplicationContext = {
 
 export function createApplicationContext(
   config: AppConfig,
-  runtime: BotRuntimeConfig,
+  runtime: BotRuntimeDefinition,
   logger: FastifyBaseLogger
 ): ApplicationContext {
   const pgPool = config.databaseUrl ? createPgPool(config.databaseUrl) : undefined;
