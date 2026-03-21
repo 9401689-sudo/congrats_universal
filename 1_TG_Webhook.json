@@ -1,0 +1,154 @@
+{
+  "name": "1_TG_Webhook",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "razresheno/tg/update",
+        "options": {}
+      },
+      "id": "1075f26a-c841-4e0c-bf3e-3d7a6e52e3f8",
+      "name": "WB_TG_UPDATE",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -464,
+        16
+      ],
+      "webhookId": "1badfe8c-761c-428b-9b50-32e3e17dd27c"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "=PgZXEG75sAQD030H"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        64,
+        -64
+      ],
+      "id": "844e0631-f697-43ea-9bdc-760266a8b928",
+      "name": "Call 'WF1 — tg_update_router' PROD",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "fbCzE1Dgd6sDsWyV",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/fbCzE1Dgd6sDsWyV",
+          "cachedResultName": "WF1 — tg_update_router DEV"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        64,
+        144
+      ],
+      "id": "11bec9b3-743f-4147-a858-de502b0bfc03",
+      "name": "Call 'WF1 — tg_update_router' DEV"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "915c6d68-280f-4fcf-aeed-64a28881be5b",
+              "leftValue": "={{ $json.body.message.chat.id }}",
+              "rightValue": 610982158,
+              "operator": {
+                "type": "number",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {
+          "ignoreCase": true
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -336,
+        -144
+      ],
+      "id": "3bc88b72-2c8f-42cf-8f11-c7c742f5c110",
+      "name": "If",
+      "disabled": true
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "WB_TG_UPDATE": {
+      "main": [
+        [
+          {
+            "node": "Call 'WF1 — tg_update_router' PROD",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Call 'WF1 — tg_update_router' DEV",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [],
+        []
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "72698ada-a2c8-45ae-b5df-fcd9da6f12b5",
+  "meta": {
+    "instanceId": "784907556f0c89efbde9ba288f0c0441c5b09242030c81d05d67aac99d485958"
+  },
+  "id": "7r0gDdR7JPE0O47D",
+  "tags": []
+}

@@ -1,0 +1,811 @@
+{
+  "name": "4_delivery_worker",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "delivery_id",
+              "type": "object"
+            }
+          ]
+        }
+      },
+      "id": "c055762a-8fe7-4141-a639-df2372f30060",
+      "typeVersion": 1.1,
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "position": [
+        -128,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select\n  d.id as delivery_id,\n  d.document_id,\n  d.scheduled_at,\n  d.delivery_method,\n  d.recipient_username,\n  d.sent_at,\n\n  doc.request_id,\n  doc.tariff,\n  doc.initiator_name,\n  doc.render_params,\n  doc.final_file_id,\n\n  r.delivery_method as request_delivery_method,\n  r.delivery_username,\n  r.user_id,\n  r.status as request_status,\n\n  u.tg_user_id\nfrom razreshenobot.deliveries d\njoin razreshenobot.documents doc\n  on doc.id = d.document_id\njoin razreshenobot.requests r\n  on r.id = doc.request_id\njoin razreshenobot.users u\n  on u.id = r.user_id\nwhere d.scheduled_at <= now()\n  and d.sent_at is null\norder by d.scheduled_at asc\nlimit 50;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        320,
+        352
+      ],
+      "id": "83716d86-8d86-4ad0-8960-b50b1f4642c4",
+      "name": "PG_GET_PENDING_DELIVERIES",
+      "credentials": {
+        "postgres": {
+          "id": "e36q5Gqlsldmqa0I",
+          "name": "Postgres razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "name": "Replace Me",
+      "typeVersion": 1,
+      "position": [
+        3952,
+        848
+      ],
+      "id": "c9fa1626-2cb4-4028-9396-08c128e849da"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        528,
+        352
+      ],
+      "id": "130037e1-efc7-473b-8d6b-eac76c75d4c3",
+      "name": "SPLIT_IN_BATCHES_DELIVERIES"
+    },
+    {
+      "parameters": {
+        "jsCode": "const row = $json;\nif (!row) throw new Error(\"Delivery row is empty\");\n\nconst deliveryId = String(row.delivery_id);\nconst documentId = String(row.document_id);\nconst requestId = String(row.request_id);\n\nconst renderParams = row.render_params ?? {};\nif (!renderParams || typeof renderParams !== \"object\") {\n  throw new Error(\"documents.render_params missing\");\n}\n\nconst deliveryMethod = String(row.delivery_method ?? row.request_delivery_method ?? \"manual\");\nconst recipientUsername = row.recipient_username ?? row.delivery_username ?? null;\nconst finalFileId = row.final_file_id ?? null;\n\nreturn [{\n  json: {\n    ...$json,\n    delivery_id: deliveryId,\n    document_id: documentId,\n    request_id: requestId,\n    delivery_method: deliveryMethod,\n    recipient_username: recipientUsername,\n    final_file_id: finalFileId,\n    render_params: renderParams\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        752,
+        368
+      ],
+      "id": "01517c4c-a97c-496e-b49d-4540687427e7",
+      "name": "FN_PREPARE_DELIVERY_CONTEXT"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "bcda2a6a-0087-41a6-ab24-75a5a8a224dd",
+              "leftValue": "={{ !!$json.final_file_id }}",
+              "rightValue": "sent",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "4c669aee-c3b9-4cfe-9f38-d47c61ef5eca",
+      "name": "IF_HAS_FINAL_FILE_ID",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        944,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const requestId = String($json.request_id);\nconst deliveryId = String($json.delivery_id);\n\nconst inPath = `/opt/razresheno/renders/tmp/delivery_${deliveryId}_final.json`;\nconst outLocal = `/opt/razresheno/renders/final/req${requestId}_delivery_${deliveryId}.png`;\n\nconst renderJson = {\n  ...($json.render_params ?? {}),\n  mode: \"final\",\n  output_path: outLocal\n};\n\nreturn [{\n  json: {\n    ...$json,\n    inPath,\n    outLocal,\n    renderJson\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1184,
+        416
+      ],
+      "id": "9b85437a-b5f8-451a-988a-2db298ca6bf1",
+      "name": "FN_BUILD_FINAL_PATHS_WORKER"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{\n  json: {\n    ...$json,\n    renderJsonText: JSON.stringify($json.renderJson)\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1376,
+        416
+      ],
+      "id": "dc7759d6-9ed4-498b-bedc-68a670a0ec77",
+      "name": "FN_STRINGIFY_FINAL_JSON_WORKER"
+    },
+    {
+      "parameters": {
+        "command": "=set -e\nmkdir -p /opt/razresheno/renders/tmp\nmkdir -p /opt/razresheno/renders/final\nprintf '%s' '{{$json.renderJsonText}}' > \"{{$json.inPath}}\""
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        1456,
+        544
+      ],
+      "id": "72cb166d-49ee-4acd-8550-1da987423a52",
+      "name": "CMD_WRITE_FINAL_JSON_WORKER",
+      "credentials": {
+        "sshPassword": {
+          "id": "JhAjso9ApJbtaT8r",
+          "name": "SSH Password account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "=set -e\n/opt/razresheno/venv/bin/python /opt/razresheno/render_doc.py \"{{$json.inPath}}\"\ntest -f \"{{$json.outLocal}}\" || (echo \"NO_FINAL_FILE {{$json.outLocal}}\" >&2; exit 1)\nls -la \"{{$json.outLocal}}\""
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        1728,
+        544
+      ],
+      "id": "0cf60264-1545-49e2-a2e0-9c6750dab76b",
+      "name": "CMD_RENDER_FINAL_WORKER",
+      "credentials": {
+        "sshPassword": {
+          "id": "JhAjso9ApJbtaT8r",
+          "name": "SSH Password account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "=set -e\nTOKEN=\"$(cat /opt/razresheno/secrets/tg_bot_token)\"\nFILE=\"{{$json.outLocal}}\"\nCHAT=\"{{$json.tg_user_id || ''}}\"\nOUT=\"/opt/razresheno/renders/tmp/tg_send_worker_upload_{{$json.delivery_id}}.json\"\n\nif [ -z \"$CHAT\" ]; then\n  echo \"tg_user_id is empty\" >&2\n  exit 1\nfi\n\ncurl -sS -X POST \"https://api.telegram.org/bot$TOKEN/sendDocument\" \\\n  -F \"chat_id=$CHAT\" \\\n  -F \"document=@$FILE\" \\\n  -F \"caption=Документ готов и направлен по расписанию.\" \\\n  > \"$OUT\"\n\ncat \"$OUT\""
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        2368,
+        560
+      ],
+      "id": "7541c890-ad13-4113-b4ca-57926c905958",
+      "name": "CMD_TG_SEND_BY_UPLOAD_WORKER",
+      "credentials": {
+        "sshPassword": {
+          "id": "JhAjso9ApJbtaT8r",
+          "name": "SSH Password account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $node[\"CMD_TG_SEND_BY_UPLOAD_WORKER\"].json.stdout ?? \"\";\nif (!raw) throw new Error(\"Telegram send response empty\");\n\nlet j;\ntry {\n  j = JSON.parse(raw);\n} catch (e) {\n  throw new Error(\"Telegram response is not JSON: \" + raw.slice(0, 300));\n}\n\nif (!j.ok) {\n  throw new Error(\"Telegram send failed: \" + JSON.stringify(j));\n}\n\nconst fileId = j.result?.document?.file_id;\nconst messageId = j.result?.message_id;\n\nif (!fileId) throw new Error(\"No document.file_id in Telegram response\");\n\nreturn [{\n  json: {\n    ...$json,\n    final_file_id: fileId,\n    tg_message_id: messageId\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2672,
+        416
+      ],
+      "id": "31acbd99-689e-4cd0-a158-66a77ccfde2c",
+      "name": "FN_PARSE_TG_SEND_UPLOAD_WORKER"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "update razreshenobot.documents\nset final_file_id = $1\nwhere id = $2::bigint\n  and final_file_id is null;",
+        "options": {
+          "queryReplacement": "={{ $json.final_file_id }}, {{ Number($json.document_id) }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2816,
+        576
+      ],
+      "id": "42597a11-9587-4d14-a50f-d836d9f6f0a7",
+      "name": "PG_SAVE_FINAL_FILE_ID_WORKER",
+      "credentials": {
+        "postgres": {
+          "id": "e36q5Gqlsldmqa0I",
+          "name": "Postgres razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "=set -e\nTOKEN=\"$(cat /opt/razresheno/secrets/tg_bot_token)\"\nCHAT=\"{{$json.tg_user_id || ''}}\"\nFILE_ID=\"{{$json.final_file_id}}\"\nOUT=\"/opt/razresheno/renders/tmp/tg_send_worker_fileid_{{$json.delivery_id}}.json\"\n\nif [ -z \"$CHAT\" ]; then\n  echo \"tg_user_id is empty\" >&2\n  exit 1\nfi\n\ncurl -sS -X POST \"https://api.telegram.org/bot$TOKEN/sendDocument\" \\\n  -F \"chat_id=$CHAT\" \\\n  -F \"document=$FILE_ID\" \\\n  -F \"caption=Документ готов и направлен по расписанию.\" \\\n  > \"$OUT\"\n\ncat \"$OUT\""
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        1152,
+        128
+      ],
+      "id": "550e2844-0981-4dac-89cf-4c1f8cf4413a",
+      "name": "CMD_TG_SEND_BY_FILE_ID_WORKER",
+      "credentials": {
+        "sshPassword": {
+          "id": "JhAjso9ApJbtaT8r",
+          "name": "SSH Password account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $node[\"CMD_TG_SEND_BY_FILE_ID_WORKER\"].json.stdout ?? \"\";\nif (!raw) throw new Error(\"Telegram send response empty\");\n\nlet j;\ntry {\n  j = JSON.parse(raw);\n} catch (e) {\n  throw new Error(\"Telegram response is not JSON: \" + raw.slice(0, 300));\n}\n\nif (!j.ok) {\n  throw new Error(\"Telegram send failed: \" + JSON.stringify(j));\n}\n\nconst messageId = j.result?.message_id;\n\nreturn [{\n  json: {\n    ...$json,\n    tg_message_id: messageId\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2496,
+        176
+      ],
+      "id": "02a5a103-d28c-479d-b20a-0bcb21e3a573",
+      "name": "FN_PARSE_TG_SEND_FILE_ID_WORKER"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "update razreshenobot.deliveries\nset sent_at = now()\nwhere id = $1::bigint\nreturning *;",
+        "options": {
+          "queryReplacement": "={{ Number($json.delivery_id) }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        3104,
+        576
+      ],
+      "id": "aa757737-4832-478e-9750-fec5047b1567",
+      "name": "PG_MARK_DELIVERY_SENT",
+      "credentials": {
+        "postgres": {
+          "id": "e36q5Gqlsldmqa0I",
+          "name": "Postgres razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "update razreshenobot.requests\nset\n  status = 'closed'::public.request_status,\n  closed_at = coalesce(closed_at, now())\nwhere id = $1::bigint\n  and status <> 'closed'::public.request_status;",
+        "options": {
+          "queryReplacement": "={{ Number($json.request_id) }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        3504,
+        432
+      ],
+      "id": "a0fc0861-7ef8-4c37-aee2-83a35d7c98e6",
+      "name": "PG_OPTIONAL_CLOSE_REQUEST_AFTER_SEND",
+      "credentials": {
+        "postgres": {
+          "id": "e36q5Gqlsldmqa0I",
+          "name": "Postgres razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "16c59855-0450-4e63-ba57-42152b420acd",
+              "name": "delivery_id",
+              "value": "=291",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        128,
+        352
+      ],
+      "id": "369767ec-cfbe-4516-b2e5-61c38579677d",
+      "name": "Edit Fields",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "0df81752-6389-4c8d-bf9f-eae595fa2818",
+      "name": "MERGE_SEAL_PICK10",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        1600,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "258f1d8a-0e26-4646-bde0-16bda8667447",
+      "name": "MERGE_SEAL_PICK",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        1872,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "7a2d33f3-9c48-4e5a-832a-77912e78c570",
+      "name": "MERGE_SEAL_PICK1",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        2464,
+        416
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "d5a1d55c-a9ee-40cd-a9f7-b21b636a31f9",
+      "name": "MERGE_SEAL_PICK2",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        2960,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "d7a16566-51ec-4521-b067-96f6f9bc322a",
+      "name": "MERGE_SEAL_PICK3",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        3296,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "5a15ac1b-06c4-47c5-a601-7274d2c36c88",
+      "name": "MERGE_SEAL_PICK11",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        2192,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "dbaf0bb9-42a2-4d10-83a9-19f2486a3fdd",
+      "name": "MERGE_SEAL_PICK4",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        2144,
+        416
+      ]
+    },
+    {
+      "parameters": {
+        "command": "=set -e\n\nSRC=\"{{$json.outLocal}}\"\nDST=\"/mnt/razresheno/renders/final/$(basename \"$SRC\")\"\n\nmkdir -p /mnt/razresheno/renders/final\n\ncp \"$SRC\" \"$DST\"\n\nls -la \"$DST\""
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        2048,
+        560
+      ],
+      "id": "bc9a57d1-4e45-4a06-b983-410f463c1ffe",
+      "name": "CMD_COPY_FINAL_TO_NEXTCLOUD",
+      "credentials": {
+        "sshPassword": {
+          "id": "JhAjso9ApJbtaT8r",
+          "name": "SSH Password account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PG_GET_PENDING_DELIVERIES": {
+      "main": [
+        [
+          {
+            "node": "SPLIT_IN_BATCHES_DELIVERIES",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Replace Me": {
+      "main": [
+        [
+          {
+            "node": "SPLIT_IN_BATCHES_DELIVERIES",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SPLIT_IN_BATCHES_DELIVERIES": {
+      "main": [
+        [],
+        [
+          {
+            "node": "FN_PREPARE_DELIVERY_CONTEXT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FN_PREPARE_DELIVERY_CONTEXT": {
+      "main": [
+        [
+          {
+            "node": "IF_HAS_FINAL_FILE_ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF_HAS_FINAL_FILE_ID": {
+      "main": [
+        [
+          {
+            "node": "CMD_TG_SEND_BY_FILE_ID_WORKER",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "MERGE_SEAL_PICK11",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "FN_BUILD_FINAL_PATHS_WORKER",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FN_BUILD_FINAL_PATHS_WORKER": {
+      "main": [
+        [
+          {
+            "node": "FN_STRINGIFY_FINAL_JSON_WORKER",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FN_STRINGIFY_FINAL_JSON_WORKER": {
+      "main": [
+        [
+          {
+            "node": "CMD_WRITE_FINAL_JSON_WORKER",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "MERGE_SEAL_PICK10",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CMD_WRITE_FINAL_JSON_WORKER": {
+      "main": [
+        [
+          {
+            "node": "MERGE_SEAL_PICK10",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "CMD_RENDER_FINAL_WORKER": {
+      "main": [
+        [
+          {
+            "node": "MERGE_SEAL_PICK",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "CMD_TG_SEND_BY_UPLOAD_WORKER": {
+      "main": [
+        [
+          {
+            "node": "MERGE_SEAL_PICK1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "FN_PARSE_TG_SEND_UPLOAD_WORKER": {
+      "main": [
+        [
+          {
+            "node": "PG_SAVE_FINAL_FILE_ID_WORKER",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "MERGE_SEAL_PICK2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CMD_TG_SEND_BY_FILE_ID_WORKER": {
+      "main": [
+        [
+          {
+            "node": "MERGE_SEAL_PICK11",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "FN_PARSE_TG_SEND_FILE_ID_WORKER": {
+      "main": [
+        [
+          {
+            "node": "PG_MARK_DELIVERY_SENT",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "MERGE_SEAL_PICK3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PG_MARK_DELIVERY_SENT": {
+      "main": [
+        [
+          {
+            "node": "MERGE_SEAL_PICK3",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "PG_SAVE_FINAL_FILE_ID_WORKER": {
+      "main": [
+        [
+          {
+            "node": "MERGE_SEAL_PICK2",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "PG_OPTIONAL_CLOSE_REQUEST_AFTER_SEND": {
+      "main": [
+        [
+          {
+            "node": "Replace Me",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "PG_GET_PENDING_DELIVERIES",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MERGE_SEAL_PICK1": {
+      "main": [
+        [
+          {
+            "node": "FN_PARSE_TG_SEND_UPLOAD_WORKER",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MERGE_SEAL_PICK": {
+      "main": [
+        [
+          {
+            "node": "MERGE_SEAL_PICK4",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "CMD_COPY_FINAL_TO_NEXTCLOUD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MERGE_SEAL_PICK10": {
+      "main": [
+        [
+          {
+            "node": "MERGE_SEAL_PICK",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "CMD_RENDER_FINAL_WORKER",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MERGE_SEAL_PICK2": {
+      "main": [
+        [
+          {
+            "node": "PG_MARK_DELIVERY_SENT",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "MERGE_SEAL_PICK3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MERGE_SEAL_PICK3": {
+      "main": [
+        [
+          {
+            "node": "PG_OPTIONAL_CLOSE_REQUEST_AFTER_SEND",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MERGE_SEAL_PICK11": {
+      "main": [
+        [
+          {
+            "node": "FN_PARSE_TG_SEND_FILE_ID_WORKER",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MERGE_SEAL_PICK4": {
+      "main": [
+        [
+          {
+            "node": "MERGE_SEAL_PICK1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "CMD_TG_SEND_BY_UPLOAD_WORKER",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CMD_COPY_FINAL_TO_NEXTCLOUD": {
+      "main": [
+        [
+          {
+            "node": "MERGE_SEAL_PICK4",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "22816fec-874a-44e7-9bab-4b723e3c7034",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "784907556f0c89efbde9ba288f0c0441c5b09242030c81d05d67aac99d485958"
+  },
+  "id": "HpOt8jlGzHkSLif7",
+  "tags": []
+}

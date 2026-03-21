@@ -1,0 +1,3573 @@
+{
+  "name": "WF1 — tg_update_router DEV",
+  "nodes": [
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "bcda2a6a-0087-41a6-ab24-75a5a8a224dd",
+              "leftValue": "={{ $items().length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "1e2dc077-d52e-45f6-92f5-3e8d34d9c9d5",
+      "name": "IF_DEDUP_EXISTS",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -8976,
+        -144
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// В production Webhook данные лежат в $json.body\nconst update = $json.body ?? $json;\n\nif (!update) {\n  throw new Error(\"No update payload\");\n}\n\n// Возможные типы апдейтов\nconst message = update.message ?? null;\nconst editedMessage = update.edited_message ?? null;\nconst callback = update.callback_query ?? null;\nconst preCheckout = update.pre_checkout_query ?? null;\nconst myChatMember = update.my_chat_member ?? null;\nconst chatMember = update.chat_member ?? null;\n\nconst successfulPayment = message?.successful_payment ?? null;\n\n// Унифицированный пользователь\nconst from =\n  callback?.from ??\n  message?.from ??\n  editedMessage?.from ??\n  preCheckout?.from ??\n  myChatMember?.from ??\n  chatMember?.from ??\n  null;\n\n// Унифицированный chat\nconst chat =\n  message?.chat ??\n  editedMessage?.chat ??\n  callback?.message?.chat ??\n  myChatMember?.chat ??\n  chatMember?.chat ??\n  null;\n\nconst chatId = chat?.id ?? null;\nconst chatType = chat?.type ?? null;\n\nconst text =\n  message?.text ??\n  editedMessage?.text ??\n  null;\n\nconst isStart =\n  typeof text === \"string\" &&\n  (text === \"/start\" || text.startsWith(\"/start \"));\n\n// Определяем тип события\nlet eventType = \"unknown\";\n\nif (callback) {\n  eventType = \"callback\";\n} else if (preCheckout) {\n  eventType = \"pre_checkout\";\n} else if (successfulPayment) {\n  eventType = \"successful_payment\";\n} else if (text) {\n  eventType = \"text\";\n} else if (myChatMember) {\n  eventType = \"my_chat_member\";\n} else if (chatMember) {\n  eventType = \"chat_member\";\n}\n\n// Платёжные поля\nconst invoicePayload =\n  preCheckout?.invoice_payload ??\n  successfulPayment?.invoice_payload ??\n  null;\n\nconst totalAmount =\n  preCheckout?.total_amount ??\n  successfulPayment?.total_amount ??\n  null;\n\nconst currency =\n  preCheckout?.currency ??\n  successfulPayment?.currency ??\n  null;\n\nconst telegramPaymentChargeId =\n  successfulPayment?.telegram_payment_charge_id ?? null;\n\nconst providerPaymentChargeId =\n  successfulPayment?.provider_payment_charge_id ?? null;\n\n// Поля membership update\nconst oldMemberStatus =\n  myChatMember?.old_chat_member?.status ??\n  chatMember?.old_chat_member?.status ??\n  null;\n\nconst newMemberStatus =\n  myChatMember?.new_chat_member?.status ??\n  chatMember?.new_chat_member?.status ??\n  null;\n\nconst botBlocked =\n  eventType === \"my_chat_member\" &&\n  newMemberStatus === \"kicked\";\n\nconst botUnblocked =\n  eventType === \"my_chat_member\" &&\n  (\n    (oldMemberStatus === \"kicked\" && newMemberStatus === \"member\") ||\n    (oldMemberStatus === \"kicked\" && newMemberStatus === \"administrator\")\n  );\n\nreturn [\n  {\n    json: {\n      update_id: update.update_id ?? null,\n      event_type: eventType,\n\n      tg_user_id: from?.id ?? null,\n      tg_username: from?.username ?? null,\n      tg_first_name: from?.first_name ?? null,\n      tg_last_name: from?.last_name ?? null,\n\n      chat_id: chatId,\n      chat_type: chatType,\n\n      text,\n      is_start: isStart,\n\n      callback_data: callback?.data ?? null,\n      callback_query_id: callback?.id ?? null,\n      callback_message_id: callback?.message?.message_id ?? null,\n\n      pre_checkout_query_id: preCheckout?.id ?? null,\n\n      invoice_payload: invoicePayload,\n      total_amount: totalAmount,\n      currency,\n\n      telegram_payment_charge_id: telegramPaymentChargeId,\n      provider_payment_charge_id: providerPaymentChargeId,\n\n      old_member_status: oldMemberStatus,\n      new_member_status: newMemberStatus,\n      bot_blocked: botBlocked,\n      bot_unblocked: botUnblocked,\n\n      successful_payment: successfulPayment ?? null,\n      raw: update\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -10608,
+        -352
+      ],
+      "id": "7cb25c89-65bc-4a6e-bd26-37156fea060d",
+      "name": "FN_NORMALIZE"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "insert into razreshenobot.users (tg_user_id, first_seen_at, last_seen_at)\nvalues ({{ $('FN_NORMALIZE').item.json.tg_user_id }}, now(), now())\non conflict (tg_user_id)\ndo update set last_seen_at = now()\nreturning id;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -8800,
+        -16
+      ],
+      "id": "1444aa01-b29a-415e-b06a-d5d6f1026b26",
+      "name": "Execute a SQL query",
+      "credentials": {
+        "postgres": {
+          "id": "e36q5Gqlsldmqa0I",
+          "name": "Postgres razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const id = $json.id;\nif (!id) throw new Error('No user id returned');\nreturn [{ json: { user_id: Number(id) } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -8432,
+        -160
+      ],
+      "id": "cae02bda-fa3c-4054-8f3e-b02b152f473c",
+      "name": "FN_USER_ID"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "915ec37e-fa78-41c8-8b2f-9a174f44853a",
+      "name": "MERGE_CTX_USER",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        -8208,
+        -192
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "bcda2a6a-0087-41a6-ab24-75a5a8a224dd",
+              "leftValue": "={{ $json.session.awaiting }}",
+              "rightValue": "recipient_name",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "ec194fa1-6729-4fb8-a11d-00e9861351ed",
+              "leftValue": "={{ $('FN_NORMALIZE').item.json.raw.message.text }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "ecdbc53d-d94e-4a0b-8ad9-bb4de3061490",
+      "name": "IF_RECIPIENT_NAME",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -5344,
+        880
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "update razreshenobot.requests\nset recipient_name = '{{ $(\"FN_NORMALIZE\").item.json.raw.message.text }}',\n    updated_at = now()\nwhere id = {{ $json.session.active_request_id }}\nreturning id, recipient_name;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -5120,
+        880
+      ],
+      "id": "263e492d-7804-4702-9a6a-99ed44451951",
+      "name": "PG_UPDATE_RECIPIENT_NAME",
+      "credentials": {
+        "postgres": {
+          "id": "e36q5Gqlsldmqa0I",
+          "name": "Postgres razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "set",
+        "key": "=razresheno:sess:{{ $('FN_NORMALIZE').item.json.tg_user_id }}",
+        "value": "={{ JSON.stringify($json.session) }}",
+        "expire": true,
+        "ttl": 86400
+      },
+      "id": "5b6e33d4-ce08-46f2-a255-9db97a3ba36e",
+      "name": "REDIS_SET_AWAITING_NONE",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        -4448,
+        1024
+      ],
+      "credentials": {
+        "redis": {
+          "id": "L8CJmx035hDrVPs3",
+          "name": "Redis razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "propertyName": "session",
+        "key": "=razresheno:sess:{{ $('FN_NORMALIZE').item.json.tg_user_id }}",
+        "options": {
+          "dotNotation": true
+        }
+      },
+      "id": "44e13444-ed7e-408f-977e-23e80942fd26",
+      "name": "REDIS_GET_SESSION",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        -8048,
+        -112
+      ],
+      "credentials": {
+        "redis": {
+          "id": "L8CJmx035hDrVPs3",
+          "name": "Redis razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot8738651494:AAEEKr11vSTrb-5y602bhqsyOHWp1sN35x8/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ \n  {\n    chat_id: $node[\"FN_NORMALIZE\"].json.chat_id,\n    text: \"🏛 Бюро «Разрешено» \\n\\nОбращение зарегистрировано.\\nПодготовка документа займет около минуты.\",\n    reply_markup: {\n      inline_keyboard: [\n        [{ text: \"Подготовить документ\", callback_data: \"GEN_FIRST\" }]\n      ]\n    }\n  } \n}}",
+        "options": {}
+      },
+      "id": "6fff5a81-cc3d-4456-8b1b-4ea96826d0ae",
+      "name": "TG_PREPARE_DOC",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -3328,
+        1024
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// SAFE SESSION PARSER (handles: object | JSON string | double-encoded JSON string)\nconst raw =\n  $json.session ??\n  $json.redis?.session ??\n  $json.redis?.data ??\n  $json.data ??\n  null;\n\nlet sess = {};\n\ntry {\n  // 1) first parse (may return object OR string)\n  let parsed = raw;\n\n  if (typeof parsed === \"string\") {\n    parsed = JSON.parse(parsed);\n  }\n\n  // 2) if still string => second parse (double-encoded)\n  if (typeof parsed === \"string\") {\n    parsed = JSON.parse(parsed);\n  }\n\n  // 3) only accept objects\n  if (parsed && typeof parsed === \"object\" && !Array.isArray(parsed)) {\n    sess = parsed;\n  }\n} catch (e) {\n  sess = {};\n}\n\n// гарантируем структуру, чтобы дальше ничего не отваливалось\nsess.active_request_id = sess.active_request_id ?? null;\nsess.awaiting = sess.awaiting ?? \"none\";\nsess.current_variant_idx = sess.current_variant_idx ?? \"0\";\nsess.last_variant_idx = sess.last_variant_idx ?? \"0\";\nsess.recipient_name = sess.recipient_name ?? null;\nsess.last_inline_message_id = sess.last_inline_message_id ?? null;\n\nreturn [{\n  json: {\n    ...$json,\n    session: sess,\n    active_request_id: sess.active_request_id ? String(sess.active_request_id) : null,\n    awaiting: String(sess.awaiting || \"none\"),\n    current_variant_idx: Number(sess.current_variant_idx || 0),\n    last_variant_idx: Number(sess.last_variant_idx || 0),\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -7648,
+        -208
+      ],
+      "id": "93401135-9a1e-49ea-b7ab-6a0fc6320d9d",
+      "name": "GET_SESSION_PARSE"
+    },
+    {
+      "parameters": {
+        "jsCode": "const sess = {\n  active_request_id: String($json.session.active_request_id),\n  awaiting: \"none\",\n  current_variant_idx: String($json.session.current_variant_idx || 0),\n  last_variant_idx: String($json.session.last_variant_idx || 0),\n};\nreturn [{ ...$json, session_json: JSON.stringify(sess) }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4672,
+        1024
+      ],
+      "id": "26b9929a-aefa-49be-b4ff-db6ee6ea4ffc",
+      "name": "FN_BUILD_SESSION_AFTER_NAME"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "cf1b2d60-ea96-48e6-9980-eecb3ece6a61",
+                    "leftValue": "={{ $json.is_start }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "f6902e9f-ad64-428a-be68-524945f9673b",
+                    "leftValue": "={{ $json.event_type }}",
+                    "rightValue": "callback",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "f041040a-6fce-4021-b7e1-a0dac6141572",
+                    "leftValue": "={{ $json.event_type }}",
+                    "rightValue": "text",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "none"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -7440,
+        -224
+      ],
+      "id": "5441e7c2-e958-44b2-ad55-3decb208838c",
+      "name": "SWITCH_MAIN"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "0b9c0b1d-b8ec-4d53-be80-9f29cff46dbc",
+                    "leftValue": "={{$json.callback_data}}",
+                    "rightValue": "START_NEW",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "13273727-285f-4382-b9a1-b0b45b457514",
+                    "leftValue": "={{$json.callback_data}}",
+                    "rightValue": "START_FORCE_NEW",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "e19947ca-7bf6-456a-94f6-e375754e254f",
+                    "leftValue": "={{$json.callback_data}}",
+                    "rightValue": "START_CONTINUE",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "cf1b2d60-ea96-48e6-9980-eecb3ece6a61",
+                    "leftValue": "={{$json.callback_data}}",
+                    "rightValue": "GEN_FIRST",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "f6902e9f-ad64-428a-be68-524945f9673b",
+                    "leftValue": "={{$json.callback_data}}",
+                    "rightValue": "GEN_NEXT",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "f041040a-6fce-4021-b7e1-a0dac6141572",
+                    "leftValue": "={{$json.callback_data}}",
+                    "rightValue": "GO_SEAL",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "a6ef9a2b-c744-4753-8b73-291b5235c7ee",
+                    "leftValue": "={{$json.callback_data}}",
+                    "rightValue": "SEAL_PICK",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "e6acc42e-b2a1-4551-a8e4-d805fdeef634",
+                    "leftValue": "={{$json.callback_data}}",
+                    "rightValue": "PAY:",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "6e226fbb-d5d4-4435-83fe-6e36b20f9e02",
+                    "leftValue": "={{$json.callback_data}}",
+                    "rightValue": "TZ_CHANGE",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "e5a00c59-3139-48e8-8995-c383b782f915",
+                    "leftValue": "={{$json.callback_data}}",
+                    "rightValue": "TZ:",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "061d35bb-cfb3-446f-a979-08e74a7be80e",
+                    "leftValue": "={{$json.callback_data}}",
+                    "rightValue": "DELIV_MANUAL",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "482a08c1-716d-445b-b996-6280cdf75fb2",
+                    "leftValue": "={{$json.callback_data}}",
+                    "rightValue": "DELIV_USERNAME",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "none"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -2256,
+        -512
+      ],
+      "id": "650e7192-ae99-43f6-b25b-58821eeef511",
+      "name": "SWITCH_CALLBACK"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "8ab8c2eb-d49d-4378-b980-3aa88dbf459f",
+      "name": "MERGE_CTX_USER1",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        -4896,
+        1024
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// FN_BUILD_TG_PAYLOAD (формирует tg_payload для HTTP node)\n\nconst chat_id = $json.chat_id ?? $node[\"FN_NORMALIZE\"]?.json?.chat_id ?? null;\nif (!chat_id) throw new Error(\"TG payload: chat_id is missing\");\n\n// Пример текста: если хочешь использовать именно текст входного сообщения — бери нормализованное $json.text\n// (raw.message.text для callback часто null)\nconst sourceText = $json.text ?? \"\";\n\n// ВАЖНО: делай текст обычной строкой, без риска поломать JSON на следующей ноде\nconst text = `Обращение зарегистрировано.\\nПодготовка документа возможна немедленно.`;\n\n// Если тебе реально надо подставлять sourceText — так безопаснее:\n/// const text = `Обращение в отношении ${sourceText} зарегистрировано.\\nПодготовка документа возможна немедленно.`;\n\nreturn [\n  {\n    json: {\n      ...$json,\n      tg_payload: {\n        chat_id,\n        text,\n        reply_markup: {\n          inline_keyboard: [\n            [{ text: \"Подготовить документ\", callback_data: \"GEN_FIRST\" }],\n          ],\n        },\n      },\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4224,
+        1024
+      ],
+      "id": "5f8777d8-9fc5-4ab5-9b9b-69848f9fc99c",
+      "name": "FN_TG_PAYLOAD",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "d02a57df-70a7-4b31-b1f3-054ce100d45d",
+      "name": "MERGE_CTX_USER2",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        -7872,
+        -208
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const awaiting = String($json.awaiting ?? $json.session?.awaiting ?? \"none\");\nconst text = $node[\"FN_NORMALIZE\"].json.text ?? null;\n\nconst isWaitingInput = [\"recipient_name\", \"delivery_username\", \"tz\"].includes(awaiting);\n\nreturn [{\n  json: {\n    ...$json,\n    text_unexpected: !!text && !isWaitingInput\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5792,
+        880
+      ],
+      "id": "462c7eae-94f2-4f27-8c28-c637d8492b7e",
+      "name": "TEXT__FN_DECIDE"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "bcda2a6a-0087-41a6-ab24-75a5a8a224dd",
+              "leftValue": "={{ $json.text_unexpected }}",
+              "rightValue": "recipient_name",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "2d58acd8-0f48-418e-a127-498b2a054bb4",
+      "name": "IF_TEXT_UNEXPECTED",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -5568,
+        880
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $node[\"FN_NORMALIZE\"].json.chat_id }}",
+        "text": "🏛 Бюро «Разрешено» \n\nСейчас управление осуществляется кнопками. Выберите действие.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -4448,
+        688
+      ],
+      "id": "afab87fd-0b91-46be-a157-ca02199cac12",
+      "name": "TG_ASK_RECIPIENT_NAME1",
+      "webhookId": "13176e21-0d69-4e42-b0d8-20783489fab1",
+      "credentials": {
+        "telegramApi": {
+          "id": "DmBk1TBpQBNZCEiU",
+          "name": "Telegram razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "bcda2a6a-0087-41a6-ab24-75a5a8a224dd",
+              "leftValue": "={{ $json.session.last_inline_message_id }}",
+              "rightValue": "fake_",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {
+          "looseTypeValidation": true
+        }
+      },
+      "id": "d450ef3a-bce6-4f2d-8b13-b295dd3b1d40",
+      "name": "START__IF_HAS_LAST_INLINE24",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -3776,
+        1024
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot8738651494:AAEEKr11vSTrb-5y602bhqsyOHWp1sN35x8/editMessageReplyMarkup",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  chat_id: $node[\"FN_NORMALIZE\"].json.chat_id,\n  message_id: Number($json.session.last_inline_message_id),\n  reply_markup: { inline_keyboard: [] }\n} }}",
+        "options": {}
+      },
+      "id": "56a63472-b51c-4dd3-9445-f0a30a9ecb6a",
+      "name": "START__TG_EDIT_RM_LAST_INLINE25",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -3552,
+        880
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "bcda2a6a-0087-41a6-ab24-75a5a8a224dd",
+              "leftValue": "={{ $json.session.last_inline_message_id }}",
+              "rightValue": "fake_",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {
+          "looseTypeValidation": true
+        }
+      },
+      "id": "72d87e77-312f-4683-a451-30a49c976d4b",
+      "name": "START__IF_HAS_LAST_INLINE25",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -4896,
+        688
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot8738651494:AAEEKr11vSTrb-5y602bhqsyOHWp1sN35x8/editMessageReplyMarkup",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  chat_id: $node[\"FN_NORMALIZE\"].json.chat_id,\n  message_id: Number($json.session.last_inline_message_id),\n  reply_markup: { inline_keyboard: [] }\n} }}",
+        "options": {}
+      },
+      "id": "797a867b-8b6c-4683-a0f7-1c8d544bf57b",
+      "name": "START__TG_EDIT_RM_LAST_INLINE26",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -4672,
+        576
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "insert into razreshenobot.update_dedup(update_id)\nvalues ($1)\non conflict do nothing\nreturning update_id;",
+        "options": {
+          "queryReplacement": "={{ $node[\"FN_NORMALIZE\"].json.update_id }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -9280,
+        -32
+      ],
+      "id": "35633781-3a64-441a-9e86-a5c833382154",
+      "name": "PG_DEDUP_TRY_INSERT",
+      "credentials": {
+        "postgres": {
+          "id": "e36q5Gqlsldmqa0I",
+          "name": "Postgres razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "propertyName": "session",
+        "key": "=razresheno:sess:{{ $('FN_NORMALIZE').item.json.tg_user_id }}",
+        "options": {
+          "dotNotation": true
+        }
+      },
+      "id": "35ced422-0b1c-49d4-b623-0b867ef9bdc2",
+      "name": "REDIS_GET_SESSION_CLB_GEN1",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        -9984,
+        -32
+      ],
+      "credentials": {
+        "redis": {
+          "id": "L8CJmx035hDrVPs3",
+          "name": "Redis razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// FN_UPSERT_SESSION_FROM_UPDATE\n// Вход ($json):\n// - нормализованный update (event_type, tg_user_id, chat_id, raw, callback_message_id, ...)\n// - session: строка JSON из Redis (как в твоём Merge-примере)\n\nconst update = $json;\n\n// 1) parse redis session string (из Merge)\nconst rawSess =\n  (typeof update.session === \"string\" ? update.session : null) ??\n  (typeof update.redis?.session === \"string\" ? update.redis.session : null) ??\n  (typeof update.redis?.data === \"string\" ? update.redis.data : null) ??\n  null;\n\nlet session = {};\ntry {\n  session = rawSess ? JSON.parse(String(rawSess)) : {};\n} catch (e) {\n  session = {};\n}\nif (!session || typeof session !== \"object\" || Array.isArray(session)) session = {};\n\n// 2) canonical ids (апдейт имеет приоритет)\nif (update.tg_user_id != null) session.tg_user_id = String(update.tg_user_id);\nif (update.chat_id != null) session.chat_id = String(update.chat_id);\nif (update.chat_type != null) session.chat_type = String(update.chat_type);\n\nsession.tg_username = update.tg_username ?? session.tg_username ?? null;\nsession.tg_first_name = update.tg_first_name ?? session.tg_first_name ?? null;\nsession.tg_last_name = update.tg_last_name ?? session.tg_last_name ?? null;\n\n// 3) last_inline_message_id — ВСЕГДА обновляем на новый message_id (если нашли)\nconst msgId =\n  update.callback_message_id ??\n  update.raw?.callback_query?.message?.message_id ??\n  update.raw?.message?.message_id ??\n  update.raw?.edited_message?.message_id ??\n  null;\n\nif (msgId != null) {\n  session.last_inline_message_id = String(msgId);\n} else {\n  // если вообще не нашли id — оставляем как было (или null, если не было)\n  session.last_inline_message_id = session.last_inline_message_id ?? null;\n}\n\n// 4) FSM defaults (не затираем существующее, только гарантируем структуру)\nsession.active_request_id = session.active_request_id ?? null;\nsession.awaiting = session.awaiting ?? \"none\";\nsession.tariff_pending = session.tariff_pending ?? null;\n\nsession.current_variant_idx = String(session.current_variant_idx ?? \"0\");\nsession.last_variant_idx = String(session.last_variant_idx ?? \"0\");\nsession.recipient_name = session.recipient_name ?? null;\n\nsession.initiator_timezone = session.initiator_timezone ?? null;\nsession.tz_return_to = session.tz_return_to ?? null;\n\n// 5) debug\nsession.last_update_id = update.update_id ?? session.last_update_id ?? null;\nsession.last_event_type = update.event_type ?? session.last_event_type ?? null;\nsession.last_callback_data = update.callback_data ?? session.last_callback_data ?? null;\n\nreturn [{ json: { ...update, session } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -9648,
+        -144
+      ],
+      "id": "0b979fa5-1475-4762-917b-4ac8ceff75e7",
+      "name": "FN_UPSERT_SESSION_FROM_UPDATE"
+    },
+    {
+      "parameters": {
+        "operation": "set",
+        "key": "=razresheno:sess:{{ $('FN_NORMALIZE').item.json.tg_user_id }}",
+        "value": "={{ JSON.stringify($json.session) }}",
+        "keyType": "string",
+        "expire": true,
+        "ttl": 86400
+      },
+      "id": "43113131-4134-4a6d-97f2-847894697364",
+      "name": "REDIS_SET_SESSION3",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        -9456,
+        -32
+      ],
+      "credentials": {
+        "redis": {
+          "id": "L8CJmx035hDrVPs3",
+          "name": "Redis razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// FN_BUILD_SESSION_FROM_NORMALIZED_UPDATE (FIXED)\n// Вход: $json = нормализованный объект из твоего парсера\n\nconst input = $json;\n\n// 0) восстановление существующей session (если ты подмешал её из Redis)\nlet session = {};\n\nif (input.session && typeof input.session === \"object\") {\n  session = { ...input.session };\n} else if (typeof input.session === \"string\") {\n  try {\n    session = JSON.parse(input.session);\n  } catch (e) {\n    session = {};\n  }\n}\n\n// 1) базовые идентификаторы\nsession.tg_user_id = input.tg_user_id != null ? String(input.tg_user_id) : (session.tg_user_id ?? null);\nsession.chat_id = input.chat_id != null ? String(input.chat_id) : (session.chat_id ?? null);\nsession.chat_type = input.chat_type ?? (session.chat_type ?? null);\n\nsession.tg_username = input.tg_username ?? (session.tg_username ?? null);\nsession.tg_first_name = input.tg_first_name ?? (session.tg_first_name ?? null);\nsession.tg_last_name = input.tg_last_name ?? (session.tg_last_name ?? null);\n\n// 2) ✅ last_inline_message_id: берём message_id “кнопочного” сообщения\nconst inlineMsgId =\n  input.callback_message_id ??                       // твой нормализатор (callback)\n  input.raw?.callback_query?.message?.message_id ??  // запасной путь (callback)\n  input.raw?.message?.message_id ??                  // текст/прочие события\n  null;\n\nif (inlineMsgId != null) {\n  session.last_inline_message_id = String(inlineMsgId);\n} else {\n  session.last_inline_message_id = session.last_inline_message_id ?? null;\n}\n\n// 3) FSM поля (дефолты)\nsession.active_request_id = session.active_request_id ?? null;\nsession.awaiting = session.awaiting ?? \"none\";\nsession.tariff_pending = session.tariff_pending ?? null;\n\nsession.current_variant_idx = session.current_variant_idx ?? \"0\";\nsession.last_variant_idx = session.last_variant_idx ?? \"0\";\nsession.recipient_name = session.recipient_name ?? null;\n\nsession.initiator_timezone = session.initiator_timezone ?? null;\nsession.tz_return_to = session.tz_return_to ?? null;\n\n// 4) служебные поля\nsession.last_update_id = input.update_id ?? (session.last_update_id ?? null);\nsession.last_event_type = input.event_type ?? (session.last_event_type ?? null);\nsession.last_callback_data = input.callback_data ?? (session.last_callback_data ?? null);\n\nreturn [\n  {\n    json: {\n      ...input,\n      session\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -10144,
+        -160
+      ],
+      "id": "43160ce7-5022-425d-bc39-890f1c2bbc1a",
+      "name": "FN_NORMALIZE1"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "bcfd4c4a-63fb-47a7-be2f-054fc2825089",
+      "name": "MERGE_CTX_USER3",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        -9840,
+        -144
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const p = $json.tg_payload;\n\nreturn [{\n  json: {\n    ...$json,\n    __debug_tg_payload_type: typeof p,\n    __debug_tg_payload_isArray: Array.isArray(p),\n    __debug_tg_payload_preview: (typeof p === 'string' ? p.slice(0, 200) : p),\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4000,
+        1024
+      ],
+      "id": "360bbcc4-0de5-4e73-960e-76dc0eb36cd7",
+      "name": "FN_TG_PAYLOAD1",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// FN_NEXT_FSM_AND_BUILD_REDIS_SET\n// Вход: $json = как в примере (update + уже распарсенная session-объектом)\n// Задача: взять session, если сейчас ожидаем имя — принять текст как имя, перевести awaiting -> \"none\"\n// и вернуть готовые поля для стандартного Redis SET (key/value/ttl) + session_json\n\nconst update = $json;\n\n// 1) session (у тебя уже объект, но на всякий случай поддержим строку)\nlet session = update.session ?? {};\nif (typeof session === \"string\") {\n  try { session = JSON.parse(session); } catch (e) { session = {}; }\n}\nif (!session || typeof session !== \"object\") session = {};\n\n// 2) всегда пишем новый message_id в last_inline_message_id (как ты хотел)\nconst newMsgId = update.raw?.message?.message_id ?? update.callback_message_id ?? null;\nif (newMsgId != null) session.last_inline_message_id = String(newMsgId);\n\n// 3) канонические поля из апдейта (не затираем важное, но обновляем идентификаторы/профиль)\nif (update.tg_user_id != null) session.tg_user_id = String(update.tg_user_id);\nif (update.chat_id != null) session.chat_id = String(update.chat_id);\nif (update.chat_type != null) session.chat_type = String(update.chat_type);\n\nsession.tg_username = update.tg_username ?? session.tg_username ?? null;\nsession.tg_first_name = update.tg_first_name ?? session.tg_first_name ?? null;\nsession.tg_last_name = update.tg_last_name ?? session.tg_last_name ?? null;\n\n// 4) FSM: если мы реально ждали имя — принимаем текст как recipient_name и выходим в awaiting=none\n// (если сейчас awaiting уже \"none\", то НЕ трогаем recipient_name)\nconst awaiting = String(session.awaiting ?? \"none\");\nconst text = typeof update.text === \"string\" ? update.text.trim() : \"\";\n\nif (awaiting === \"recipient_name\") {\n  if (text) session.recipient_name = text;\n  session.awaiting = \"none\";\n}\n\n// 5) дефолты, чтобы дальше не ломались\nsession.active_request_id = session.active_request_id ?? null;\nsession.current_variant_idx = String(session.current_variant_idx ?? \"0\");\nsession.last_variant_idx = String(session.last_variant_idx ?? \"0\");\nsession.tariff_pending = session.tariff_pending ?? null;\nsession.initiator_timezone = session.initiator_timezone ?? null;\nsession.tz_return_to = session.tz_return_to ?? null;\n\nsession.last_update_id = update.update_id ?? session.last_update_id ?? null;\nsession.last_event_type = update.event_type ?? session.last_event_type ?? null;\nsession.last_callback_data = update.callback_data ?? session.last_callback_data ?? null;\n\n// 6) готовим выход под Redis SET\nconst redisKey = `razresheno:sess:${session.tg_user_id ?? update.tg_user_id}`;\n\n// value лучше хранить строкой\nconst session_json = JSON.stringify(session);\n\nreturn [\n  {\n    json: {\n      ...update,\n      session,\n      redis: {\n        key: redisKey,\n        value: session_json,\n        ttl: 86400,\n      },\n      session_json,\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5344,
+        688
+      ],
+      "id": "5f2c4e18-947a-4fee-8cf4-bcb19a0aebf8",
+      "name": "TEXT__FN_DECIDE1"
+    },
+    {
+      "parameters": {
+        "operation": "set",
+        "key": "=razresheno:sess:{{ $('FN_NORMALIZE').item.json.tg_user_id }}",
+        "value": "={{ JSON.stringify($json.session) }}",
+        "expire": true,
+        "ttl": 86400
+      },
+      "id": "e40e5150-6ac6-4ecc-9849-153634635b60",
+      "name": "TZ_CHANGE__REDIS_SET_SESSION1",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        -5120,
+        688
+      ],
+      "credentials": {
+        "redis": {
+          "id": "L8CJmx035hDrVPs3",
+          "name": "Redis razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1) Достаём текст из разных возможных мест (n8n normalize у всех разный)\nconst rawText =\n  $json.message?.text ??\n  $json.update?.message?.text ??\n  $json.body?.message?.text ??\n  $json.text ??\n  $json.message_text ??\n  '';\n\nlet raw = String(rawText);\n\n// 2) Чистим невидимые символы + переносы строк\nraw = raw\n  .replace(/[\\u200B-\\u200D\\uFEFF]/g, '') // zero-width\n  .replace(/\\u00A0/g, ' ')               // NBSP\n  .replace(/\\r?\\n|\\r/g, '')\n  .trim();\n\n// 3) Иногда юзер присылает \"email: xxx\" — уберём префикс и пунктуацию по краям\nraw = raw.replace(/^(e-?mail|email|почта)\\s*:\\s*/i, '');\nraw = raw.replace(/^mailto:\\s*/i, '');\nraw = raw.replace(/^[<(\"'\\s]+/, '').replace(/[>\")'\\s.,;:]+$/, '');\n\nconst email = raw.toLowerCase();\n\nconst session = $json.session;\nif (!session) throw new Error('NO_SESSION');\n\n// 4) Регэксп, который точно пропустит 9401689@gmail.com\nconst ok = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email);\n\nif (!ok) {\n  return [{\n    ok: false,\n    error_message: \"Похоже, email указан неверно. Пример: name@example.com\",\n    debug: {\n      // покажем, что реально пришло\n      rawText,\n      normalized: email,\n      charCodes: [...email].map(c => c.charCodeAt(0)),\n      keys: Object.keys($json),\n    },\n    ...$json\n  }];\n}\n\nsession.customer_email = email;\nsession.awaiting_email = false;\n\nreturn [{\n  ok: true,\n  session,\n  email,\n  ...$json\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5600,
+        112
+      ],
+      "id": "7671ba21-7051-4cd2-9d6c-8e33ffd935da",
+      "name": "TEXT__FN_SAVE_EMAIL"
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw =\n  $json.session ??\n  $json.data ??\n  $json.redis?.session ??\n  $json.redis?.data ??\n  null;\n\nlet sess = {};\ntry {\n  sess = raw ? JSON.parse(raw) : {};\n} catch (e) {\n  sess = {};\n}\n\n// --- Гарантируем структуру ---\nif (!sess || typeof sess !== 'object') {\n  sess = {};\n}\n\n// Обязательные поля\nsess.active_request_id = sess.active_request_id ?? null;\nsess.awaiting = sess.awaiting ?? \"none\";\nsess.recipient_name = sess.recipient_name ?? null;\nsess.current_variant_idx = sess.current_variant_idx ?? \"0\";\nsess.last_variant_idx = sess.last_variant_idx ?? \"0\";\n\n// Новые поля для TZ логики\nsess.initiator_timezone = sess.initiator_timezone ?? null;\nsess.tariff_pending = sess.tariff_pending ?? null;\n\nreturn [{\n  json: {\n    ...$json,\n    session: sess,                  // <- ВАЖНО: возвращаем весь session\n    active_request_id: sess.active_request_id // оставляем для совместимости\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -6736,
+        576
+      ],
+      "id": "0688e75e-fe35-4087-a20a-369bc9104e27",
+      "name": "FN_PARSE_SESSION_PAY"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "bcda2a6a-0087-41a6-ab24-75a5a8a224dd",
+              "leftValue": "={{$json.session?.awaiting_email}}",
+              "rightValue": "recipient_name",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "865d6fa8-2561-454a-bc62-7aac8489f5fe",
+      "name": "TEXT__IF_AWAITING_EMAIL",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -6048,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "bcda2a6a-0087-41a6-ab24-75a5a8a224dd",
+              "leftValue": "={{$json.ok}}",
+              "rightValue": "recipient_name",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f55f91cc-8abc-4dba-8703-ff22c5426568",
+      "name": "TEXT__IF_EMAIL_VALID",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -5376,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $node[\"FN_NORMALIZE\"].json.chat_id }}",
+        "text": "🏛 Бюро «Разрешено» \n\nПохоже, email указан неверно. Пример: name@example.com",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -5152,
+        112
+      ],
+      "id": "6eec68b0-8988-4040-9760-506f0570a5b1",
+      "name": "TG_ASK_RECIPIENT_NAME2",
+      "webhookId": "b5faa24b-e6b1-4938-851c-d93c4e1d31b0",
+      "credentials": {
+        "telegramApi": {
+          "id": "DmBk1TBpQBNZCEiU",
+          "name": "Telegram razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "set",
+        "key": "=razresheno:sess:{{ $('FN_NORMALIZE').item.json.tg_user_id }}",
+        "value": "={{ JSON.stringify($json.session || {}) }}",
+        "keyType": "string",
+        "expire": true,
+        "ttl": 86400
+      },
+      "id": "47bb6619-cfdc-48e7-ae57-ece17694abb0",
+      "name": "START__REDIS_SET_SESSION",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        -5152,
+        -80
+      ],
+      "credentials": {
+        "redis": {
+          "id": "L8CJmx035hDrVPs3",
+          "name": "Redis razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot8738651494:AAEEKr11vSTrb-5y602bhqsyOHWp1sN35x8/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ ({\n  chat_id: Number($json.session.tg_user_id),\n  text: '🏛 Бюро «Разрешено» \\n\\nEmail сохранён. Можно продолжить оплату.',\n  reply_markup: {\n    inline_keyboard: [\n      [\n        {\n          text: '💳 Продолжить оплату',\n          callback_data: 'PAY:' + String($json.session.tariff_pending)\n        }\n      ]\n    ]\n  }\n}) }}",
+        "options": {}
+      },
+      "id": "26feb004-85b1-487d-bc8b-e478e2bc6caa",
+      "name": "TZ_CHANGE__SEND_TZ_KEYBOARD1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -4928,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "bcda2a6a-0087-41a6-ab24-75a5a8a224dd",
+              "leftValue": "={{$json.session.awaiting}}",
+              "rightValue": "delivery_username",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "f80efb5d-c639-46ea-870e-b67c3f39abe9",
+              "leftValue": "={{$json.session.tariff_pending}}",
+              "rightValue": "199",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "9a9f7be5-1258-4a0f-82c4-0f5627f62ba3",
+      "name": "TEXT__IF_AWAITING_DELIV_USERNAME",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -6288,
+        576
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "let u = String($json.message?.text ?? '').trim();\nu = u.replace(/\\s+/g, '');\nif (!u.startsWith('@')) u = '@' + u;\n\nconst ok = /^@[A-Za-z0-9_]{5,32}$/.test(u);\nif (!ok) {\n  return [{\n    json: {\n      ...$json,\n      ok: false,\n      error_message: \"Неверный формат. Пример: @ivan_ivanov\"\n    }\n  }];\n}\n\n// важный момент: awaiting сбрасываем только при успехе\nconst session = { ...$json.session, awaiting: 'none' };\n\nreturn [{\n  json: {\n    ...$json,\n    ok: true,\n    username: u,\n    session\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -6016,
+        688
+      ],
+      "id": "58bfda49-349a-4892-9b41-b8cba6f16e5a",
+      "name": "TEXT__FN_VALIDATE_USERNAME"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $node[\"FN_NORMALIZE\"].json.chat_id }}",
+        "text": "🏛 Бюро «Разрешено» \n\nПохоже, username указан неверно. Пример: @example",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -5568,
+        688
+      ],
+      "id": "846b7dbb-49bb-48c2-a740-59455950828f",
+      "name": "TG__USERNAME_BAD",
+      "webhookId": "103e3ce8-e136-4203-8f2f-433ed20e8ee1",
+      "credentials": {
+        "telegramApi": {
+          "id": "DmBk1TBpQBNZCEiU",
+          "name": "Telegram razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE razreshenobot.requests\nSET delivery_method = 'username'::public.delivery_method,\n    delivery_username = '{{$json.text}}'\nWHERE id = {{$json.session.active_request_id}}::bigint;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -4832,
+        352
+      ],
+      "id": "e2594b3e-834c-4861-a284-797f32de8ad4",
+      "name": "TEXT__PG_SET_USERNAME_METHOD",
+      "credentials": {
+        "postgres": {
+          "id": "e36q5Gqlsldmqa0I",
+          "name": "Postgres razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "set",
+        "key": "=razresheno:sess:{{ $('FN_NORMALIZE').item.json.tg_user_id }}",
+        "value": "={{ JSON.stringify($json.session || {}) }}",
+        "keyType": "string",
+        "expire": true,
+        "ttl": 86400
+      },
+      "id": "e4e9412e-54c9-43dc-be43-848e97505321",
+      "name": "START__REDIS_SET_SESSION7",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        -3936,
+        352
+      ],
+      "credentials": {
+        "redis": {
+          "id": "L8CJmx035hDrVPs3",
+          "name": "Redis razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "bcda2a6a-0087-41a6-ab24-75a5a8a224dd",
+              "leftValue": "={{$json.session.tariff_pending}}",
+              "rightValue": "199",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a7d22cd5-4109-4884-b991-6395ed0532d8",
+      "name": "TEXT__IF_TARIFF_PENDING_199",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -4384,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "bcda2a6a-0087-41a6-ab24-75a5a8a224dd",
+              "leftValue": "={{ $json.session?.last_inline_message_id }}",
+              "rightValue": "fake_",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {
+          "looseTypeValidation": true
+        }
+      },
+      "id": "882a9085-1a28-4759-8ffb-376656a604df",
+      "name": "START__IF_HAS_LAST_INLINE32",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -3712,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot8738651494:AAEEKr11vSTrb-5y602bhqsyOHWp1sN35x8/editMessageReplyMarkup",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  chat_id: $node[\"FN_NORMALIZE\"].json.chat_id,\n  message_id: $node[\"FN_PARSE_SESSION\"].json.session?.last_inline_message_id,\n  reply_markup: { inline_keyboard: [] }\n} }}",
+        "options": {}
+      },
+      "id": "4c96d794-8419-4192-a67f-e9c27831db90",
+      "name": "START__TG_EDIT_RM_LAST_INLINE30",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -3488,
+        352
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot8738651494:AAEEKr11vSTrb-5y602bhqsyOHWp1sN35x8/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n({\n  chat_id: Number($json.session.tg_user_id),\n  text: `🏛 Бюро «Разрешено» \\n\\nПринято: ${$json.text}. Можно продолжить оплату.`,\n  reply_markup: {\n    inline_keyboard: [\n      [{ text: \"💳 Продолжить оплату\", callback_data: \"PAY:199\" }]\n    ]\n  }\n})\n}}",
+        "options": {}
+      },
+      "id": "a4df46c5-f6dd-4d6f-a9ca-8e9944d5b5f4",
+      "name": "TG_PREPARE_DOC6",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -3040,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "5336b4c3-7b58-4e7e-b4ee-ec5dbdb768dc",
+      "name": "MERGE_CTX_USER7",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        -3264,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "propertyName": "session",
+        "key": "=razresheno:sess:{{ $('FN_NORMALIZE').item.json.tg_user_id }}",
+        "options": {
+          "dotNotation": true
+        }
+      },
+      "id": "78ad1f89-f797-46f6-9054-bb0ae4e1c8bf",
+      "name": "TZ_CHANGE__REDIS_GET_SESSION1",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        -6960,
+        576
+      ],
+      "credentials": {
+        "redis": {
+          "id": "L8CJmx035hDrVPs3",
+          "name": "Redis razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "bcda2a6a-0087-41a6-ab24-75a5a8a224dd",
+              "leftValue": "={{$json.ok}}",
+              "rightValue": "delivery_username",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "ed17d88e-1495-460a-97a7-c2d0d459cd88",
+      "name": "TEXT__IF_USERNAME_OK",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -5792,
+        688
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "8509d2c7-f3dc-4b10-b554-3ae3b99faf62",
+      "name": "MERGE_CTX_USER8",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        -6512,
+        576
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "844e9e87-7f00-4b5a-94dc-ad7d1a73d4bf",
+      "name": "MERGE_CTX_USER9",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        -4608,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Берём вход как есть\nconst input = $json;\n\n// Гарантируем session\nconst session = { ...(input.session ?? {}) };\n\n// Ставим FSM ожидание username\nsession.awaiting = 'email';\n\n// Обычно полезно зафиксировать, что мы продолжаем тариф 199\n// Если не нужно — удаляй эти 2 строки\nsession.tariff_pending = session.tariff_pending ?? '199';\n\n// Служебное: обновим updated_at (если используешь)\nsession.updated_at = Date.now();\n\n// Сформируем стандарт для Redis SET\nconst tgUserId = String(session.tg_user_id ?? input.tg_user_id ?? '');\nif (!tgUserId) {\n  throw new Error('NO_TG_USER_ID_FOR_REDIS_SESSION');\n}\n\nconst redis_key = `razresheno:sess:${tgUserId}`;\nconst redis_value = JSON.stringify(session);\nconst redis_ttl = 86400;\n\nreturn [{\n  json: {\n    ...input,\n    session,\n    redis_key,\n    redis_value,\n    redis_ttl,\n  },\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4160,
+        352
+      ],
+      "id": "b101fb1e-36aa-4d57-9cec-62065e4ed95b",
+      "name": "PAY199__FN_SET_LAST_INLINE_ID2"
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -10784,
+        -352
+      ],
+      "id": "0c469d09-6af9-4904-80cd-9068fddebd38",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "3abf607f-f182-4ae7-8fa4-8a5dcf359be5",
+      "name": "MERGE_CTX_USER17",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        -9152,
+        -144
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "57134cce-0a85-4468-a5d5-63ffb84575a3",
+      "name": "MERGE_CTX_USER18",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        -8640,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "bcda2a6a-0087-41a6-ab24-75a5a8a224dd",
+              "leftValue": "={{ $json.event_type }}",
+              "rightValue": "my_chat_member",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "befb48fc-2e5c-4344-a176-7cf2aa76654b",
+      "name": "IF_DEDUP_EXISTS1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -10416,
+        -352
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "bcda2a6a-0087-41a6-ab24-75a5a8a224dd",
+              "leftValue": "={{ $json.bot_blocked }}",
+              "rightValue": "my_chat_member",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "9079bcd9-8784-469b-960d-f7dd9aa88a93",
+      "name": "IF_BOT_BLOCKED",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -10160,
+        -448
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "Rnh2vdzINyHA25Ab",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/Rnh2vdzINyHA25Ab",
+          "cachedResultName": "2_START_INTRO"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -7104,
+        -384
+      ],
+      "id": "f68c4ed5-bdef-4ad0-81a1-348a41352f13",
+      "name": "Call '2_START_INTRO'"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "039b68f7-2a6c-4597-9b03-2c7403a3daca",
+              "name": "tg_user_id",
+              "value": "={{ $('FN_NORMALIZE1').item.json.tg_user_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -6912,
+        -384
+      ],
+      "id": "72b7c369-1d6a-41d5-8c3e-e7b05a8a851d",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "eUEULrK9LXoOY54R",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/eUEULrK9LXoOY54R",
+          "cachedResultName": "2_save_session_final"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -6720,
+        -384
+      ],
+      "id": "8d8a349f-3e51-4fbc-a4bd-f642a87fc825",
+      "name": "Call '2_save_session_final'1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "039b68f7-2a6c-4597-9b03-2c7403a3daca",
+              "name": "tg_user_id",
+              "value": "={{ $('FN_NORMALIZE1').item.json.tg_user_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -768,
+        -1984
+      ],
+      "id": "82aa00fc-cd19-4711-a9cb-3ab9738dbabc",
+      "name": "Edit Fields2"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "eUEULrK9LXoOY54R",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/eUEULrK9LXoOY54R",
+          "cachedResultName": "2_save_session_final"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -576,
+        -1984
+      ],
+      "id": "f67368d7-ea7c-4a6a-9afa-39c7ac655220",
+      "name": "Call '2_save_session_final'2"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "CqKUFwn82ugJ8vt2",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/CqKUFwn82ugJ8vt2",
+          "cachedResultName": "2_START"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -960,
+        -1984
+      ],
+      "id": "81f246f7-5b78-4d75-83d0-93b229426ba5",
+      "name": "Call '2_START'"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "039b68f7-2a6c-4597-9b03-2c7403a3daca",
+              "name": "tg_user_id",
+              "value": "={{ $('FN_NORMALIZE1').item.json.tg_user_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -768,
+        -1744
+      ],
+      "id": "467b7594-435d-4486-9490-07a0e9189dda",
+      "name": "Edit Fields3"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "eUEULrK9LXoOY54R",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/eUEULrK9LXoOY54R",
+          "cachedResultName": "2_save_session_final"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -576,
+        -1744
+      ],
+      "id": "31579214-1fc5-4e8c-903a-803b2077ddf8",
+      "name": "Call '2_save_session_final'3"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "ArnuV47WgGlIG7ju",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/ArnuV47WgGlIG7ju",
+          "cachedResultName": "2_GEN"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -960,
+        -1744
+      ],
+      "id": "345f9afb-f53e-496e-88f0-30c717f6cb38",
+      "name": "Call '2_GEN'"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={\n  \"update_id\": \"{{$json.update_id}}\",\n  \"event_type\": \"{{$json.event_type}}\",\n  \"tg_user_id\": \"{{$json.tg_user_id}}\",\n  \"tg_username\": \"{{$json.tg_username}}\",\n  \"tg_first_name\": \"{{$json.tg_first_name}}\",\n  \"tg_last_name\": \"{{$json.tg_last_name}}\",\n  \"chat_id\": \"{{$json.chat_id}}\",\n  \"chat_type\": \"{{$json.chat_type}}\",\n  \"text\": \"{{$json.text}}\",\n  \"is_start\": \"{{$json.is_start}}\",\n  \"callback_data\": \"{{$json.callback_data}}\",\n  \"callback_query_id\": \"{{$json.callback_query_id}}\",\n  \"callback_message_id\": \"{{$json.callback_message_id}}\",\n  \"pre_checkout_query_id\": \"{{$json.pre_checkout_query_id}}\",\n  \"invoice_payload\": \"{{$json.invoice_payload}}\",\n  \"total_amount\": \"{{$json.total_amount}}\",\n  \"currency\": \"{{$json.currency}}\",\n  \"telegram_payment_charge_id\": \"{{$json.telegram_payment_charge_id}}\",\n  \"provider_payment_charge_id\": \"{{$json.provider_payment_charge_id}}\",\n  \"old_member_status\": \"{{$json.old_member_status}}\",\n  \"new_member_status\": \"{{$json.new_member_status}}\",\n  \"bot_blocked\": \"{{$json.bot_blocked}}\",\n  \"bot_unblocked\": \"{{$json.bot_unblocked}}\",\n  \"successful_payment\": \"{{$json.successful_payment}}\",\n  \"user_id\": \"{{$json.user_id}}\",\n\n  \"raw\": {\n    \"update_id\": \"{{$json.raw.update_id}}\",\n    \"callback_query\": {\n      \"id\": \"{{$json.raw.callback_query.id}}\",\n      \"from\": {\n        \"id\": \"{{$json.raw.callback_query.from.id}}\",\n        \"is_bot\": \"{{$json.raw.callback_query.from.is_bot}}\",\n        \"first_name\": \"{{$json.raw.callback_query.from.first_name}}\",\n        \"last_name\": \"{{$json.raw.callback_query.from.last_name}}\",\n        \"username\": \"{{$json.raw.callback_query.from.username}}\",\n        \"language_code\": \"{{$json.raw.callback_query.from.language_code}}\",\n        \"is_premium\": \"{{$json.raw.callback_query.from.is_premium}}\"\n      },\n      \"message\": {\n        \"message_id\": \"{{$json.raw.callback_query.message.message_id}}\",\n        \"from\": {\n          \"id\": \"{{$json.raw.callback_query.message.from.id}}\",\n          \"is_bot\": \"{{$json.raw.callback_query.message.from.is_bot}}\",\n          \"first_name\": \"{{$json.raw.callback_query.message.from.first_name}}\",\n          \"username\": \"{{$json.raw.callback_query.message.from.username}}\"\n        },\n        \"chat\": {\n          \"id\": \"{{$json.raw.callback_query.message.chat.id}}\",\n          \"first_name\": \"{{$json.raw.callback_query.message.chat.first_name}}\",\n          \"last_name\": \"{{$json.raw.callback_query.message.chat.last_name}}\",\n          \"username\": \"{{$json.raw.callback_query.message.chat.username}}\",\n          \"type\": \"{{$json.raw.callback_query.message.chat.type}}\"\n        },\n        \"date\": \"{{$json.raw.callback_query.message.date}}\",\n        \"text\": \"{{$json.raw.callback_query.message.text}}\",\n        \"reply_markup\": {\n          \"inline_keyboard\": [\n            [\n              {\n                \"text\": \"{{$json.raw.callback_query.message.reply_markup.inline_keyboard[0][0].text}}\",\n                \"callback_data\": \"{{$json.raw.callback_query.message.reply_markup.inline_keyboard[0][0].callback_data}}\"\n              }\n            ]\n          ]\n        }\n      },\n      \"chat_instance\": \"{{$json.raw.callback_query.chat_instance}}\",\n      \"data\": \"{{$json.raw.callback_query.data}}\"\n    }\n  },\n\n  \"session\": {\n    \"tg_user_id\": \"{{$json.session.tg_user_id}}\",\n    \"chat_id\": \"{{$json.session.chat_id}}\",\n    \"chat_type\": \"{{$json.session.chat_type}}\",\n    \"tg_username\": \"{{$json.session.tg_username}}\",\n    \"tg_first_name\": \"{{$json.session.tg_first_name}}\",\n    \"tg_last_name\": \"{{$json.session.tg_last_name}}\",\n    \"last_inline_message_id\": \"{{$json.session.last_inline_message_id}}\",\n    \"active_request_id\": \"{{$json.session.active_request_id}}\",\n    \"awaiting\": \"{{$json.session.awaiting}}\",\n    \"tariff_pending\": \"{{$json.session.tariff_pending}}\",\n    \"current_variant_idx\": \"{{$json.session.current_variant_idx}}\",\n    \"last_variant_idx\": \"{{$json.session.last_variant_idx}}\",\n    \"recipient_name\": \"{{$json.session.recipient_name}}\",\n    \"initiator_timezone\": \"{{$json.session.initiator_timezone}}\",\n    \"tz_return_to\": \"{{$json.session.tz_return_to}}\",\n    \"last_update_id\": \"{{$json.session.last_update_id}}\",\n    \"last_event_type\": \"{{$json.session.last_event_type}}\",\n    \"last_callback_data\": \"{{$json.session.last_callback_data}}\"\n  },\n\n  \"active_request_id\": \"{{$json.active_request_id}}\",\n  \"awaiting\": \"{{$json.awaiting}}\",\n  \"current_variant_idx\": \"{{$json.current_variant_idx}}\",\n  \"last_variant_idx\": \"{{$json.last_variant_idx}}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1152,
+        -1984
+      ],
+      "id": "51df9940-b89a-476d-b674-5d00d60f95bd",
+      "name": "Edit Fields4"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "039b68f7-2a6c-4597-9b03-2c7403a3daca",
+              "name": "tg_user_id",
+              "value": "={{ $('FN_NORMALIZE1').item.json.tg_user_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -656,
+        -1488
+      ],
+      "id": "a5c81c6f-d23f-4451-8c90-2e7c74e2c7b8",
+      "name": "Edit Fields5"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "eUEULrK9LXoOY54R",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/eUEULrK9LXoOY54R",
+          "cachedResultName": "2_save_session_final"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -464,
+        -1488
+      ],
+      "id": "f8afbd37-8079-4b93-9250-edbbbfd17e54",
+      "name": "Call '2_save_session_final'4"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "039b68f7-2a6c-4597-9b03-2c7403a3daca",
+              "name": "tg_user_id",
+              "value": "={{ $('FN_NORMALIZE1').item.json.tg_user_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -448,
+        -160
+      ],
+      "id": "3760d3ea-18e7-46bc-b37d-0b13ee583654",
+      "name": "Edit Fields6"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "eUEULrK9LXoOY54R",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/eUEULrK9LXoOY54R",
+          "cachedResultName": "2_save_session_final"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -256,
+        -160
+      ],
+      "id": "cebe36c8-302c-47c3-ad86-f2c1d2806cf0",
+      "name": "Call '2_save_session_final'5"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "039b68f7-2a6c-4597-9b03-2c7403a3daca",
+              "name": "tg_user_id",
+              "value": "={{ $('FN_NORMALIZE1').item.json.tg_user_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -544,
+        -1264
+      ],
+      "id": "3f3add7a-da30-4408-b969-2c8722963e12",
+      "name": "Edit Fields7"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "eUEULrK9LXoOY54R",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/eUEULrK9LXoOY54R",
+          "cachedResultName": "2_save_session_final"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -352,
+        -1264
+      ],
+      "id": "b548ec75-c6e9-4c60-bd8b-acb2872b75dd",
+      "name": "Call '2_save_session_final'6"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "GyV8BBLOufhdHzCU",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/GyV8BBLOufhdHzCU",
+          "cachedResultName": "2_SEAL_PICK"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -736,
+        -1264
+      ],
+      "id": "e5d8229a-1e09-4919-af92-21e3157eba1f",
+      "name": "Call '2_SEAL_PICK'"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "kXFPqpqCCF2VdPLN",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/kXFPqpqCCF2VdPLN",
+          "cachedResultName": "2_GO_SEAL"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -848,
+        -1488
+      ],
+      "id": "cc2f040e-a20b-446b-908e-192f38666e7c",
+      "name": "Call '2_GO_SEAL'"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "8GklqHAITA2QoxC9",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/8GklqHAITA2QoxC9",
+          "cachedResultName": "2_DELIV_USERNAME"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -640,
+        -160
+      ],
+      "id": "a178cf38-4652-4ee1-938a-cde4ff1435e1",
+      "name": "Call '2_DELIV_USERNAME'"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "039b68f7-2a6c-4597-9b03-2c7403a3daca",
+              "name": "tg_user_id",
+              "value": "={{ $('FN_NORMALIZE1').item.json.tg_user_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -528,
+        -1024
+      ],
+      "id": "b680f63f-9c37-41fb-bc1c-9bcca64718a0",
+      "name": "Edit Fields10"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "eUEULrK9LXoOY54R",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/eUEULrK9LXoOY54R",
+          "cachedResultName": "2_save_session_final"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -336,
+        -1024
+      ],
+      "id": "e91d9ae0-be9c-4d23-8472-26878383d63e",
+      "name": "Call '2_save_session_final'8"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "HZfitTmjqhiWMMqV",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/HZfitTmjqhiWMMqV",
+          "cachedResultName": "2_PAY"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -720,
+        -1024
+      ],
+      "id": "66dafacb-6f04-45cd-b570-9e1df66d77b9",
+      "name": "Call '2_PAY'"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "039b68f7-2a6c-4597-9b03-2c7403a3daca",
+              "name": "tg_user_id",
+              "value": "={{ $('FN_NORMALIZE1').item.json.tg_user_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -464,
+        -352
+      ],
+      "id": "fcb50401-5e1e-4cbe-8d6e-9bf906806d79",
+      "name": "Edit Fields9"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "eUEULrK9LXoOY54R",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/eUEULrK9LXoOY54R",
+          "cachedResultName": "2_save_session_final"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -272,
+        -352
+      ],
+      "id": "0a128c5f-d273-45e7-b7d1-baab8b0532de",
+      "name": "Call '2_save_session_final'7"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "LWlilTTedJ9mQ6Qg",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/LWlilTTedJ9mQ6Qg",
+          "cachedResultName": "2_DELIV_MANUAL"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -656,
+        -352
+      ],
+      "id": "5dec80df-4331-45a3-bfe5-537423421083",
+      "name": "Call '2_DELIV_MANUAL'"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "039b68f7-2a6c-4597-9b03-2c7403a3daca",
+              "name": "tg_user_id",
+              "value": "={{ $('FN_NORMALIZE1').item.json.tg_user_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -2880,
+        800
+      ],
+      "id": "328bee81-39eb-45c7-8fb0-d7e061a0c77c",
+      "name": "Edit Fields12"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "eUEULrK9LXoOY54R",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/eUEULrK9LXoOY54R",
+          "cachedResultName": "2_save_session_final"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -2688,
+        800
+      ],
+      "id": "a536d5ae-1d7f-41e9-a45e-488c79456345",
+      "name": "Call '2_save_session_final'10"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "039b68f7-2a6c-4597-9b03-2c7403a3daca",
+              "name": "tg_user_id",
+              "value": "={{ $('FN_NORMALIZE1').item.json.tg_user_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -544,
+        -800
+      ],
+      "id": "73f11253-794d-4515-96df-284380709b80",
+      "name": "Edit Fields11"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "eUEULrK9LXoOY54R",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/eUEULrK9LXoOY54R",
+          "cachedResultName": "2_save_session_final"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -352,
+        -800
+      ],
+      "id": "f07e2300-c68d-40e2-bf93-7e38c84b4299",
+      "name": "Call '2_save_session_final'9"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "039b68f7-2a6c-4597-9b03-2c7403a3daca",
+              "name": "tg_user_id",
+              "value": "={{ $('FN_NORMALIZE1').item.json.tg_user_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -512,
+        -576
+      ],
+      "id": "d3fbad85-a05f-4edc-8f81-86757b2a347a",
+      "name": "Edit Fields13"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "eUEULrK9LXoOY54R",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/eUEULrK9LXoOY54R",
+          "cachedResultName": "2_save_session_final"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -320,
+        -576
+      ],
+      "id": "80e0d076-167e-4ec8-8a93-055fe26c8017",
+      "name": "Call '2_save_session_final'11"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "gqShLVJ9Q7VcgBQz",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/gqShLVJ9Q7VcgBQz",
+          "cachedResultName": "2_TZ_CHANGE"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -736,
+        -800
+      ],
+      "id": "39c33c2a-10a0-4b16-8b26-11b6740a166a",
+      "name": "Call '2_TZ_CHANGE'"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "tKQKIPDJc3GSuWNP",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/tKQKIPDJc3GSuWNP",
+          "cachedResultName": "2_TZ"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -704,
+        -576
+      ],
+      "id": "1d989140-ec41-4ffe-b8a0-e39b7a82672d",
+      "name": "Call '2_TZ'"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "IF_DEDUP_EXISTS": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "MERGE_CTX_USER18",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "FN_NORMALIZE": {
+      "main": [
+        [
+          {
+            "node": "IF_DEDUP_EXISTS1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query": {
+      "main": [
+        [
+          {
+            "node": "MERGE_CTX_USER18",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "MERGE_CTX_USER": {
+      "main": [
+        [
+          {
+            "node": "REDIS_GET_SESSION",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "MERGE_CTX_USER2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FN_USER_ID": {
+      "main": [
+        [
+          {
+            "node": "MERGE_CTX_USER",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "IF_RECIPIENT_NAME": {
+      "main": [
+        [
+          {
+            "node": "PG_UPDATE_RECIPIENT_NAME",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PG_UPDATE_RECIPIENT_NAME": {
+      "main": [
+        [
+          {
+            "node": "MERGE_CTX_USER1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "REDIS_SET_AWAITING_NONE": {
+      "main": [
+        [
+          {
+            "node": "FN_TG_PAYLOAD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "REDIS_GET_SESSION": {
+      "main": [
+        [
+          {
+            "node": "MERGE_CTX_USER2",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "GET_SESSION_PARSE": {
+      "main": [
+        [
+          {
+            "node": "SWITCH_MAIN",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FN_BUILD_SESSION_AFTER_NAME": {
+      "main": [
+        [
+          {
+            "node": "REDIS_SET_AWAITING_NONE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SWITCH_MAIN": {
+      "main": [
+        [
+          {
+            "node": "Call '2_START_INTRO'",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "SWITCH_CALLBACK",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "TZ_CHANGE__REDIS_GET_SESSION1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "MERGE_CTX_USER8",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MERGE_CTX_USER1": {
+      "main": [
+        [
+          {
+            "node": "FN_BUILD_SESSION_AFTER_NAME",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FN_TG_PAYLOAD": {
+      "main": [
+        [
+          {
+            "node": "FN_TG_PAYLOAD1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MERGE_CTX_USER2": {
+      "main": [
+        [
+          {
+            "node": "GET_SESSION_PARSE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SWITCH_CALLBACK": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields4",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit Fields4",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call '2_GO_SEAL'",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call '2_GEN'",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call '2_GEN'",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call '2_GO_SEAL'",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call '2_SEAL_PICK'",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call '2_PAY'",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call '2_TZ_CHANGE'",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call '2_TZ'",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call '2_DELIV_MANUAL'",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Call '2_DELIV_USERNAME'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TEXT__FN_DECIDE": {
+      "main": [
+        [
+          {
+            "node": "IF_TEXT_UNEXPECTED",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF_TEXT_UNEXPECTED": {
+      "main": [
+        [
+          {
+            "node": "TEXT__FN_DECIDE1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "IF_RECIPIENT_NAME",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "MERGE_CTX_USER1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "START__IF_HAS_LAST_INLINE24": {
+      "main": [
+        [
+          {
+            "node": "START__TG_EDIT_RM_LAST_INLINE25",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "TG_PREPARE_DOC",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "START__TG_EDIT_RM_LAST_INLINE25": {
+      "main": [
+        [
+          {
+            "node": "TG_PREPARE_DOC",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "START__IF_HAS_LAST_INLINE25": {
+      "main": [
+        [
+          {
+            "node": "START__TG_EDIT_RM_LAST_INLINE26",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "TG_ASK_RECIPIENT_NAME1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "START__TG_EDIT_RM_LAST_INLINE26": {
+      "main": [
+        [
+          {
+            "node": "TG_ASK_RECIPIENT_NAME1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PG_DEDUP_TRY_INSERT": {
+      "main": [
+        [
+          {
+            "node": "MERGE_CTX_USER17",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "REDIS_GET_SESSION_CLB_GEN1": {
+      "main": [
+        [
+          {
+            "node": "MERGE_CTX_USER3",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "FN_UPSERT_SESSION_FROM_UPDATE": {
+      "main": [
+        [
+          {
+            "node": "REDIS_SET_SESSION3",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "MERGE_CTX_USER17",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "REDIS_SET_SESSION3": {
+      "main": [
+        [
+          {
+            "node": "PG_DEDUP_TRY_INSERT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TG_ASK_RECIPIENT_NAME1": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields12",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TG_PREPARE_DOC": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields12",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FN_NORMALIZE1": {
+      "main": [
+        [
+          {
+            "node": "REDIS_GET_SESSION_CLB_GEN1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "MERGE_CTX_USER3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MERGE_CTX_USER3": {
+      "main": [
+        [
+          {
+            "node": "FN_UPSERT_SESSION_FROM_UPDATE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FN_TG_PAYLOAD1": {
+      "main": [
+        [
+          {
+            "node": "START__IF_HAS_LAST_INLINE24",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TEXT__FN_DECIDE1": {
+      "main": [
+        [
+          {
+            "node": "TZ_CHANGE__REDIS_SET_SESSION1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TZ_CHANGE__REDIS_SET_SESSION1": {
+      "main": [
+        [
+          {
+            "node": "START__IF_HAS_LAST_INLINE25",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FN_PARSE_SESSION_PAY": {
+      "main": [
+        [
+          {
+            "node": "MERGE_CTX_USER8",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "TEXT__IF_AWAITING_EMAIL": {
+      "main": [
+        [
+          {
+            "node": "TEXT__FN_SAVE_EMAIL",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "TEXT__FN_DECIDE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TEXT__FN_SAVE_EMAIL": {
+      "main": [
+        [
+          {
+            "node": "TEXT__IF_EMAIL_VALID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TEXT__IF_EMAIL_VALID": {
+      "main": [
+        [
+          {
+            "node": "START__REDIS_SET_SESSION",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "TG_ASK_RECIPIENT_NAME2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "START__REDIS_SET_SESSION": {
+      "main": [
+        [
+          {
+            "node": "TZ_CHANGE__SEND_TZ_KEYBOARD1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TZ_CHANGE__SEND_TZ_KEYBOARD1": {
+      "main": [
+        [
+          {
+            "node": "SWITCH_CALLBACK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TEXT__IF_AWAITING_DELIV_USERNAME": {
+      "main": [
+        [
+          {
+            "node": "TEXT__FN_VALIDATE_USERNAME",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "TEXT__IF_AWAITING_EMAIL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TEXT__FN_VALIDATE_USERNAME": {
+      "main": [
+        [
+          {
+            "node": "TEXT__IF_USERNAME_OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TEXT__PG_SET_USERNAME_METHOD": {
+      "main": [
+        [
+          {
+            "node": "MERGE_CTX_USER9",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "START__REDIS_SET_SESSION7": {
+      "main": [
+        [
+          {
+            "node": "START__IF_HAS_LAST_INLINE32",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "START__IF_HAS_LAST_INLINE32": {
+      "main": [
+        [
+          {
+            "node": "START__TG_EDIT_RM_LAST_INLINE30",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "MERGE_CTX_USER7",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "TG_PREPARE_DOC6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "START__TG_EDIT_RM_LAST_INLINE30": {
+      "main": [
+        [
+          {
+            "node": "MERGE_CTX_USER7",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "MERGE_CTX_USER7": {
+      "main": [
+        [
+          {
+            "node": "TG_PREPARE_DOC6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TEXT__IF_TARIFF_PENDING_199": {
+      "main": [
+        [
+          {
+            "node": "PAY199__FN_SET_LAST_INLINE_ID2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "TZ_CHANGE__REDIS_GET_SESSION1": {
+      "main": [
+        [
+          {
+            "node": "FN_PARSE_SESSION_PAY",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TEXT__IF_USERNAME_OK": {
+      "main": [
+        [
+          {
+            "node": "TG__USERNAME_BAD",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "TEXT__PG_SET_USERNAME_METHOD",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "MERGE_CTX_USER9",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MERGE_CTX_USER8": {
+      "main": [
+        [
+          {
+            "node": "TEXT__IF_AWAITING_DELIV_USERNAME",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MERGE_CTX_USER9": {
+      "main": [
+        [
+          {
+            "node": "TEXT__IF_TARIFF_PENDING_199",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PAY199__FN_SET_LAST_INLINE_ID2": {
+      "main": [
+        [
+          {
+            "node": "START__REDIS_SET_SESSION7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "FN_NORMALIZE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MERGE_CTX_USER17": {
+      "main": [
+        [
+          {
+            "node": "IF_DEDUP_EXISTS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MERGE_CTX_USER18": {
+      "main": [
+        [
+          {
+            "node": "FN_USER_ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF_DEDUP_EXISTS1": {
+      "main": [
+        [
+          {
+            "node": "IF_BOT_BLOCKED",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "FN_NORMALIZE1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "MERGE_CTX_USER",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF_BOT_BLOCKED": {
+      "main": [
+        []
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "Call '2_save_session_final'1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call '2_START_INTRO'": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields2": {
+      "main": [
+        [
+          {
+            "node": "Call '2_save_session_final'2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call '2_START'": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields3": {
+      "main": [
+        [
+          {
+            "node": "Call '2_save_session_final'3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call '2_GEN'": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields4": {
+      "main": [
+        [
+          {
+            "node": "Call '2_START'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields5": {
+      "main": [
+        [
+          {
+            "node": "Call '2_save_session_final'4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields6": {
+      "main": [
+        [
+          {
+            "node": "Call '2_save_session_final'5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields7": {
+      "main": [
+        [
+          {
+            "node": "Call '2_save_session_final'6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call '2_SEAL_PICK'": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call '2_GO_SEAL'": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call '2_DELIV_USERNAME'": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields10": {
+      "main": [
+        [
+          {
+            "node": "Call '2_save_session_final'8",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call '2_PAY'": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields10",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields9": {
+      "main": [
+        [
+          {
+            "node": "Call '2_save_session_final'7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call '2_DELIV_MANUAL'": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields9",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields12": {
+      "main": [
+        [
+          {
+            "node": "Call '2_save_session_final'10",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields11": {
+      "main": [
+        [
+          {
+            "node": "Call '2_save_session_final'9",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields13": {
+      "main": [
+        [
+          {
+            "node": "Call '2_save_session_final'11",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call '2_TZ_CHANGE'": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields11",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call '2_TZ'": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields13",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "619b6af0-c7e5-4b57-8272-559d1cdd64dd",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "784907556f0c89efbde9ba288f0c0441c5b09242030c81d05d67aac99d485958"
+  },
+  "id": "fbCzE1Dgd6sDsWyV",
+  "tags": []
+}

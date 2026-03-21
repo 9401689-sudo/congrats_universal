@@ -1,0 +1,911 @@
+{
+  "name": "2_GO_SEAL",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "get",
+        "propertyName": "variant_raw",
+        "key": "=razresheno:req:{{$json.active_request_id}}:v:{{$json.last_variant_idx}}",
+        "options": {
+          "dotNotation": true
+        }
+      },
+      "id": "1c7ad6d1-e5ec-4c46-9a65-4dc6c66d2398",
+      "name": "REDIS_GET_SESSION_CLB_GEN2",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        1856,
+        800
+      ],
+      "credentials": {
+        "redis": {
+          "id": "L8CJmx035hDrVPs3",
+          "name": "Redis razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "propertyName": "session",
+        "key": "=razresheno:sess:{{ $('When Executed by Another Workflow').item.json.tg_user_id }}",
+        "options": {
+          "dotNotation": true
+        }
+      },
+      "id": "7645505a-8b0c-4d26-8cb0-4ad89cfcb8ec",
+      "name": "GO_SEAL__REDIS_GET_SESSION",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        512,
+        -80
+      ],
+      "credentials": {
+        "redis": {
+          "id": "L8CJmx035hDrVPs3",
+          "name": "Redis razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot8738651494:AAEEKr11vSTrb-5y602bhqsyOHWp1sN35x8/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  chat_id: $node[\"When Executed by Another Workflow\"].json.chat_id,\n  text: \"🏛 Бюро «Разрешено» \\n\\nОбращение не найдено.\\nПодайте новое обращение командой /start.\"\n}) }}",
+        "options": {}
+      },
+      "id": "74d5fe81-b287-4f8c-b53e-93e485cdd5a8",
+      "name": "GO_SEAL__SEND_NO_REQUEST",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1632,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// GO_SEAL__FN_PARSE_SESSION\n\n// Поддерживаем разные места, где может лежать строка session\nconst raw =\n  $json.session ??\n  $json.redis?.session ??\n  $json.redis?.data ??\n  $json.data ??\n  $json.session_raw ??\n  null;\n\nlet sess = {};\ntry {\n  sess = raw ? JSON.parse(raw) : {};\n} catch (e) {\n  sess = {};\n}\n\nreturn [\n  {\n    ...$json,\n    active_request_id: sess.active_request_id ?? null,\n    awaiting: sess.awaiting ?? \"none\",\n    recipient_name: sess.recipient_name ?? null,\n    current_variant_idx: Number(sess.current_variant_idx ?? 0),\n    last_variant_idx: Number(sess.last_variant_idx ?? 0),\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        736,
+        -80
+      ],
+      "id": "20e4c903-b4f2-413a-9fb4-6b1b44f3b98a",
+      "name": "GO_SEAL__FN_PARSE_SESSION"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "bcda2a6a-0087-41a6-ab24-75a5a8a224dd",
+              "leftValue": "={{$json.active_request_id}}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "84610b68-cc20-44e6-800d-a51f0ef6a970",
+      "name": "GO_SEAL__IF_NO_SESSION_OR_REQUEST",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        960,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "bcda2a6a-0087-41a6-ab24-75a5a8a224dd",
+              "leftValue": "={{$json.seal_pick_idx}}",
+              "rightValue": "={{$json.last_variant_idx}}",
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "37eb285a-589f-426d-a8e1-121be21a0655",
+      "name": "GO_SEAL__IF_NO_VARIANTS",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1632,
+        656
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot8738651494:AAEEKr11vSTrb-5y602bhqsyOHWp1sN35x8/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  chat_id: $node[\"When Executed by Another Workflow\"].json.chat_id,\n  text: `🏛 Бюро «Разрешено» \\n\\nВариант №${$json.seal_pick_idx} ещё не подготовлен.\\nСейчас доступно вариантов: ${$json.last_variant_idx}.`,\n  reply_markup: {\n    inline_keyboard: [\n      [\n        { text: \"Подготовить другой вариант\", callback_data: \"GEN_NEXT\" }\n      ],\n      [\n        { text: \"Перейти к заверению\", callback_data: \"GO_SEAL\" }\n      ]\n    ]\n  }\n}) }}",
+        "options": {}
+      },
+      "id": "8a1bbaf1-cf05-433f-bf65-1c0b9fc5d641",
+      "name": "GO_SEAL__SEND_NEED_GENERATE",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        2304,
+        416
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "bcda2a6a-0087-41a6-ab24-75a5a8a224dd",
+              "leftValue": "={{$json.variant_raw}}",
+              "rightValue": "={{$json.last_variant_idx}}",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "e184e9ec-491b-49cf-b689-b4dc7767d247",
+      "name": "GO_SEAL__IF_VARIANTS_LT_3",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2528,
+        736
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot8738651494:AAEEKr11vSTrb-5y602bhqsyOHWp1sN35x8/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  chat_id: $node[\"When Executed by Another Workflow\"].json.chat_id,\n  text: `🏛 Бюро «Разрешено» \\nДля вступления документа в силу требуется заверение. После этого будет убран водяной знак и добавлен инициатор документа (вы).\n\nСейчас подготовлено вариантов: ${$node[\"START_NEW__FN_PARSE_SESSION2\"].json.last_variant_idx}.\nВы можете заверить текущий вариант или подготовить ещё один.`,\n  reply_markup: {\n    inline_keyboard: [\n      [\n        {\n          text: `Заверить текущий вариант (№${$node[\"START_NEW__FN_PARSE_SESSION2\"].json.last_variant_idx})`,\n          callback_data: `SEAL_PICK:${$node[\"START_NEW__FN_PARSE_SESSION2\"].json.last_variant_idx}`\n        }\n      ],\n      [\n        {\n          text: \"Подготовить другой вариант\",\n          callback_data: \"GEN_NEXT\"\n        }\n      ]\n    ]\n  }\n}) }}",
+        "options": {}
+      },
+      "id": "b3d18929-a1fc-46ff-b6c2-6f3c1de982ca",
+      "name": "GO_SEAL__SEND_SEAL_WITH_CURRENT_AND_GENNEXT",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        3200,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot8738651494:AAEEKr11vSTrb-5y602bhqsyOHWp1sN35x8/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  chat_id: $node[\"When Executed by Another Workflow\"].json.chat_id,\n  text: `🏛 Бюро «Разрешено» \\n\\nДля вступления документа в силу требуется заверение. После этого будет убран водяной знак и добавлен инициатор документа (вы).\n\nПодготовка вариантов завершена.\nУкажите вариант, подлежащий заверению.`,\n  reply_markup: {\n    inline_keyboard: Array.from(\n      { length: Number($('GO_SEAL__IF_NO_SESSION_OR_REQUEST').item.json.last_variant_idx || 0) },\n      (_, i) => ([\n        {\n          text: `Вариант ${i + 1}`,\n          callback_data: `SEAL_PICK:${i + 1}`\n        }\n      ])\n    )\n  }\n}) }}",
+        "options": {}
+      },
+      "id": "f146da97-b4c6-4a7e-8f16-9f7e4caec256",
+      "name": "GO_SEAL__SEND_PICK_1_2_3",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        3200,
+        880
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "propertyName": "session",
+        "key": "=razresheno:sess:{{ $('When Executed by Another Workflow').item.json.tg_user_id }}",
+        "options": {
+          "dotNotation": true
+        }
+      },
+      "id": "ee10ea28-fc02-4f25-9d57-4fd4210daa41",
+      "name": "START_NEW__REDIS_GET_SESSION2",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        -160,
+        -80
+      ],
+      "credentials": {
+        "redis": {
+          "id": "L8CJmx035hDrVPs3",
+          "name": "Redis razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw =\n  $json.session ??\n  $json.data ??\n  $json.redis?.session ??\n  $json.redis?.data ??\n  null;\n\nlet sess = {};\ntry { sess = raw ? JSON.parse(String(raw)) : {}; } catch (e) { sess = {}; }\nif (!sess || typeof sess !== \"object\") sess = {};\n\n// обязательные поля\nsess.active_request_id = sess.active_request_id ?? null;\nsess.awaiting = sess.awaiting ?? \"none\";\nsess.current_variant_idx = sess.current_variant_idx ?? \"0\";\nsess.last_variant_idx = sess.last_variant_idx ?? \"0\";\nsess.recipient_name = sess.recipient_name ?? null;\n\nsess.initiator_timezone = sess.initiator_timezone ?? null;\nsess.tariff_pending = sess.tariff_pending ?? null;\n\n// новые UX-поля\nsess.last_inline_message_id = sess.last_inline_message_id ?? null;\n\nreturn [{ json: { ...$json, session: sess } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        64,
+        -80
+      ],
+      "id": "4360f1da-bd3e-4214-b8f9-e5a017c15c2e",
+      "name": "START_NEW__FN_PARSE_SESSION2"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { ...$json, callback_data: \"GO_SEAL\" } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        288,
+        -80
+      ],
+      "id": "79675c74-6eb0-4bc6-bb42-e1c1f5f9bd4d",
+      "name": "START_CONTINUE__FN_SET_GO_SEAL"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "bcda2a6a-0087-41a6-ab24-75a5a8a224dd",
+              "leftValue": "={{ $node[\"START_NEW__FN_PARSE_SESSION2\"].json.session?.last_inline_message_id }}",
+              "rightValue": "fake_",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {
+          "looseTypeValidation": true
+        }
+      },
+      "id": "7ba47cdb-b8cd-4999-a65f-57b3ed8035ba",
+      "name": "START__IF_HAS_LAST_INLINE6",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1184,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot8738651494:AAEEKr11vSTrb-5y602bhqsyOHWp1sN35x8/editMessageReplyMarkup",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  chat_id: $node[\"When Executed by Another Workflow\"].json.chat_id,\n  message_id: $node[\"When Executed by Another Workflow\"].json.session?.last_inline_message_id,\n  reply_markup: { inline_keyboard: [] }\n} }}",
+        "options": {}
+      },
+      "id": "5dcc25e4-0576-4c78-bccb-de7f494ab67b",
+      "name": "START__TG_EDIT_RM_LAST_INLINE7",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1408,
+        -16
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "bcda2a6a-0087-41a6-ab24-75a5a8a224dd",
+              "leftValue": "={{ $json.session.last_inline_message_id }}",
+              "rightValue": "fake_",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {
+          "looseTypeValidation": true
+        }
+      },
+      "id": "981d1ea7-d5fe-40df-ab53-f9e37f3dcc52",
+      "name": "START__IF_HAS_LAST_INLINE7",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1856,
+        416
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot8738651494:AAEEKr11vSTrb-5y602bhqsyOHWp1sN35x8/editMessageReplyMarkup",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  chat_id: $node[\"When Executed by Another Workflow\"].json.chat_id,\n  message_id: Number($json.session.last_inline_message_id),\n  reply_markup: { inline_keyboard: [] }\n} }}",
+        "options": {}
+      },
+      "id": "3d949fd9-0ea1-4f56-a58a-8039c43b4c7e",
+      "name": "START__TG_EDIT_RM_LAST_INLINE8",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        2080,
+        496
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "bcda2a6a-0087-41a6-ab24-75a5a8a224dd",
+              "leftValue": "={{ $json.session.last_inline_message_id }}",
+              "rightValue": "fake_",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {
+          "looseTypeValidation": true
+        }
+      },
+      "id": "2ca12ffb-8bba-436f-a634-11ab034af1bf",
+      "name": "START__IF_HAS_LAST_INLINE8",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2752,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot8738651494:AAEEKr11vSTrb-5y602bhqsyOHWp1sN35x8/editMessageReplyMarkup",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  chat_id: $node[\"When Executed by Another Workflow\"].json.chat_id,\n  message_id: Number($json.session.last_inline_message_id),\n  reply_markup: { inline_keyboard: [] }\n} }}",
+        "options": {}
+      },
+      "id": "14542747-100c-4e43-b09a-3966bdb42bfe",
+      "name": "START__TG_EDIT_RM_LAST_INLINE9",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        2976,
+        656
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "bcda2a6a-0087-41a6-ab24-75a5a8a224dd",
+              "leftValue": "={{ $json.session.last_inline_message_id }}",
+              "rightValue": "fake_",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {
+          "looseTypeValidation": true
+        }
+      },
+      "id": "be5e67b8-02cb-4b57-9d53-bd8c8aa901bc",
+      "name": "START__IF_HAS_LAST_INLINE9",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2752,
+        880
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot8738651494:AAEEKr11vSTrb-5y602bhqsyOHWp1sN35x8/editMessageReplyMarkup",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  chat_id: $node[\"FN_NORMALIZE\"].json.chat_id,\n  message_id: Number($json.session.last_inline_message_id),\n  reply_markup: { inline_keyboard: [] }\n} }}",
+        "options": {}
+      },
+      "id": "bcfa6adf-69db-48d5-9b40-ca1f9844feb8",
+      "name": "START__TG_EDIT_RM_LAST_INLINE10",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        2976,
+        944
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "456735c6-45fb-4aa7-bde0-b4f591f6e00e",
+      "name": "MERGE_SEAL_PICK",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        2080,
+        736
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// PARSE_SESSION_FROM_STRING\n// Вход: $json.session = строка JSON (как в примере)\n\nlet sess = {};\n\ntry {\n  const raw = $json.session ?? null;\n\n  // иногда прилетает уже объект\n  if (raw && typeof raw === \"object\") {\n    sess = raw;\n  } else if (typeof raw === \"string\" && raw.trim()) {\n    sess = JSON.parse(raw);\n\n    // на случай \"двойной сериализации\" (строка внутри строки)\n    if (typeof sess === \"string\") {\n      sess = JSON.parse(sess);\n    }\n  }\n} catch (e) {\n  sess = {};\n}\n\nif (!sess || typeof sess !== \"object\" || Array.isArray(sess)) sess = {};\n\n// (опционально) дефолты, чтобы дальше не падали ноды\nsess.active_request_id = sess.active_request_id ?? null;\nsess.awaiting = sess.awaiting ?? \"none\";\nsess.current_variant_idx = String(sess.current_variant_idx ?? \"0\");\nsess.last_variant_idx = String(sess.last_variant_idx ?? \"0\");\nsess.recipient_name = sess.recipient_name ?? null;\nsess.last_inline_message_id = sess.last_inline_message_id ?? null;\n\nsess.tg_user_id = sess.tg_user_id ?? null;\nsess.chat_id = sess.chat_id ?? null;\nsess.chat_type = sess.chat_type ?? null;\nsess.tg_username = sess.tg_username ?? null;\nsess.tg_first_name = sess.tg_first_name ?? null;\nsess.tg_last_name = sess.tg_last_name ?? null;\n\nsess.tariff_pending = sess.tariff_pending ?? null;\nsess.initiator_timezone = sess.initiator_timezone ?? null;\nsess.tz_return_to = sess.tz_return_to ?? null;\n\nreturn [{ json: { ...$json, session: sess } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2304,
+        736
+      ],
+      "id": "89335702-af78-45e1-9a5a-f638fc3fbd05",
+      "name": "SEAL_PICK__FN_PARSE_AND_VALIDATE_VARIANT1"
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -336,
+        -80
+      ],
+      "id": "82547a37-54f7-4c23-a2a5-0f0f931a1dd1",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "eUEULrK9LXoOY54R",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/eUEULrK9LXoOY54R",
+          "cachedResultName": "2_save_session_final"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        4112,
+        288
+      ],
+      "id": "622fb086-9b6d-4ced-ba53-429b9ddbc791",
+      "name": "Call '2_save_session_final'"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "REDIS_GET_SESSION_CLB_GEN2": {
+      "main": [
+        [
+          {
+            "node": "MERGE_SEAL_PICK",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "GO_SEAL__REDIS_GET_SESSION": {
+      "main": [
+        [
+          {
+            "node": "GO_SEAL__FN_PARSE_SESSION",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GO_SEAL__FN_PARSE_SESSION": {
+      "main": [
+        [
+          {
+            "node": "GO_SEAL__IF_NO_SESSION_OR_REQUEST",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GO_SEAL__IF_NO_SESSION_OR_REQUEST": {
+      "main": [
+        [
+          {
+            "node": "START__IF_HAS_LAST_INLINE6",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "GO_SEAL__IF_NO_VARIANTS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GO_SEAL__IF_NO_VARIANTS": {
+      "main": [
+        [
+          {
+            "node": "START__IF_HAS_LAST_INLINE7",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "REDIS_GET_SESSION_CLB_GEN2",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "MERGE_SEAL_PICK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GO_SEAL__IF_VARIANTS_LT_3": {
+      "main": [
+        [
+          {
+            "node": "START__IF_HAS_LAST_INLINE8",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "START__IF_HAS_LAST_INLINE9",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "START_NEW__REDIS_GET_SESSION2": {
+      "main": [
+        [
+          {
+            "node": "START_NEW__FN_PARSE_SESSION2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "START_NEW__FN_PARSE_SESSION2": {
+      "main": [
+        [
+          {
+            "node": "START_CONTINUE__FN_SET_GO_SEAL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "START_CONTINUE__FN_SET_GO_SEAL": {
+      "main": [
+        [
+          {
+            "node": "GO_SEAL__REDIS_GET_SESSION",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "START__IF_HAS_LAST_INLINE6": {
+      "main": [
+        [
+          {
+            "node": "START__TG_EDIT_RM_LAST_INLINE7",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "GO_SEAL__SEND_NO_REQUEST",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "START__TG_EDIT_RM_LAST_INLINE7": {
+      "main": [
+        [
+          {
+            "node": "GO_SEAL__SEND_NO_REQUEST",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "START__IF_HAS_LAST_INLINE7": {
+      "main": [
+        [
+          {
+            "node": "START__TG_EDIT_RM_LAST_INLINE8",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "GO_SEAL__SEND_NEED_GENERATE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "START__TG_EDIT_RM_LAST_INLINE8": {
+      "main": [
+        [
+          {
+            "node": "GO_SEAL__SEND_NEED_GENERATE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "START__IF_HAS_LAST_INLINE8": {
+      "main": [
+        [
+          {
+            "node": "START__TG_EDIT_RM_LAST_INLINE9",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "GO_SEAL__SEND_SEAL_WITH_CURRENT_AND_GENNEXT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "START__TG_EDIT_RM_LAST_INLINE9": {
+      "main": [
+        [
+          {
+            "node": "GO_SEAL__SEND_SEAL_WITH_CURRENT_AND_GENNEXT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "START__IF_HAS_LAST_INLINE9": {
+      "main": [
+        [
+          {
+            "node": "START__TG_EDIT_RM_LAST_INLINE10",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "GO_SEAL__SEND_PICK_1_2_3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "START__TG_EDIT_RM_LAST_INLINE10": {
+      "main": [
+        [
+          {
+            "node": "GO_SEAL__SEND_PICK_1_2_3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MERGE_SEAL_PICK": {
+      "main": [
+        [
+          {
+            "node": "SEAL_PICK__FN_PARSE_AND_VALIDATE_VARIANT1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SEAL_PICK__FN_PARSE_AND_VALIDATE_VARIANT1": {
+      "main": [
+        [
+          {
+            "node": "GO_SEAL__IF_VARIANTS_LT_3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "START_NEW__REDIS_GET_SESSION2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GO_SEAL__SEND_NO_REQUEST": {
+      "main": [
+        [
+          {
+            "node": "Call '2_save_session_final'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GO_SEAL__SEND_NEED_GENERATE": {
+      "main": [
+        [
+          {
+            "node": "Call '2_save_session_final'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GO_SEAL__SEND_SEAL_WITH_CURRENT_AND_GENNEXT": {
+      "main": [
+        [
+          {
+            "node": "Call '2_save_session_final'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GO_SEAL__SEND_PICK_1_2_3": {
+      "main": [
+        [
+          {
+            "node": "Call '2_save_session_final'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "7d26c5ed-c392-4cf1-a959-e139d9432a4f",
+  "meta": {
+    "instanceId": "784907556f0c89efbde9ba288f0c0441c5b09242030c81d05d67aac99d485958"
+  },
+  "id": "kXFPqpqCCF2VdPLN",
+  "tags": []
+}

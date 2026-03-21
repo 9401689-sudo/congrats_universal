@@ -1,0 +1,552 @@
+{
+  "name": "2_START",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "insert into razreshenobot.requests (\n    user_id,\n    status,\n    created_at,\n    updated_at\n)\nvalues (\n  {{ $('When Executed by Another Workflow').item.json.user_id }},\n  'open',\n  now(),\n  now()\n)\nreturning id;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -1424,
+        160
+      ],
+      "id": "18ef003f-a731-46b8-80d6-8608d645f8b7",
+      "name": "PG_CREATE_REQUEST",
+      "credentials": {
+        "postgres": {
+          "id": "e36q5Gqlsldmqa0I",
+          "name": "Postgres razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "set",
+        "key": "=razresheno:sess:{{ $('When Executed by Another Workflow').item.json.tg_user_id }}",
+        "value": "={{ JSON.stringify($json.session) }}",
+        "expire": true,
+        "ttl": 86400
+      },
+      "id": "8a91f12c-8d5f-4229-9067-c09100169abd",
+      "name": "REDIS_SET_SESSION",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        -592,
+        16
+      ],
+      "credentials": {
+        "redis": {
+          "id": "L8CJmx035hDrVPs3",
+          "name": "Redis razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $node[\"When Executed by Another Workflow\"].json.chat_id }}",
+        "text": "🏛 Бюро Разрешено\n\nОбращение принято.\nБюро Разрешено приступает к рассмотрению.\n\nУкажите на чье имя будет выдан документ.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        80,
+        16
+      ],
+      "id": "559737a1-0274-48ef-8c78-43cc3bb324b8",
+      "name": "TG_ASK_RECIPIENT_NAME",
+      "webhookId": "3a6280d3-9746-47fe-a3b2-7324af6bbd44",
+      "credentials": {
+        "telegramApi": {
+          "id": "DmBk1TBpQBNZCEiU",
+          "name": "Telegram razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const { id, ...rest } = $json;\n\nreturn [{\n  ...rest,\n  request_id: id,\n  active_request_id: id,\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1040,
+        16
+      ],
+      "id": "1d63095e-8481-4714-89cf-d92d931e80ad",
+      "name": "FN_SET_REQUEST_ID"
+    },
+    {
+      "parameters": {
+        "jsCode": "const sess = {\n  active_request_id: String($json.active_request_id),\n  awaiting: \"recipient_name\",\n  current_variant_idx: \"0\",\n  last_variant_idx: \"0\",\n};\nreturn [{ ...$json, session: JSON.stringify(sess) }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -816,
+        16
+      ],
+      "id": "13ac97df-bb46-47cd-ac0e-34322e64ceb0",
+      "name": "FN_SET_SESSION"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "propertyName": "session",
+        "key": "=razresheno:sess:{{ $('When Executed by Another Workflow').item.json.tg_user_id }}",
+        "options": {
+          "dotNotation": true
+        }
+      },
+      "id": "bd63d6ce-a5b0-47fe-978e-7832840834f3",
+      "name": "START_NEW__REDIS_GET_SESSION1",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        -2496,
+        -16
+      ],
+      "credentials": {
+        "redis": {
+          "id": "L8CJmx035hDrVPs3",
+          "name": "Redis razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw =\n  $json.session ??\n  $json.data ??\n  $json.redis?.session ??\n  $json.redis?.data ??\n  null;\n\nlet sess = {};\ntry { sess = raw ? JSON.parse(String(raw)) : {}; } catch (e) { sess = {}; }\nif (!sess || typeof sess !== \"object\") sess = {};\n\n// обязательные поля\nsess.active_request_id = sess.active_request_id ?? null;\nsess.awaiting = sess.awaiting ?? \"none\";\nsess.current_variant_idx = sess.current_variant_idx ?? \"0\";\nsess.last_variant_idx = sess.last_variant_idx ?? \"0\";\nsess.recipient_name = sess.recipient_name ?? null;\n\nsess.initiator_timezone = sess.initiator_timezone ?? null;\nsess.tariff_pending = sess.tariff_pending ?? null;\n\n// новые UX-поля\nsess.last_inline_message_id = sess.last_inline_message_id ?? null;\n\nreturn [{ json: { ...$json, session: sess } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2272,
+        -16
+      ],
+      "id": "94907d18-003a-46b2-a44b-c6f6b4343740",
+      "name": "START_NEW__FN_PARSE_SESSION1"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "update razreshenobot.requests\nset status = 'cancelled',\n    closed_at = now(),\n    updated_at = now()\nwhere id = $1\n  and status = 'open';",
+        "options": {
+          "queryReplacement": "={{ Number($json.session.active_request_id) }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -2048,
+        128
+      ],
+      "id": "26c1a7a2-edd4-41cf-8ac1-b8c3fa994b19",
+      "name": "START_FORCE_NEW__PG_CLOSE_OLD",
+      "credentials": {
+        "postgres": {
+          "id": "e36q5Gqlsldmqa0I",
+          "name": "Postgres razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const sess = $json.session ?? {};\nsess.active_request_id = null;\nsess.awaiting = \"none\";\nsess.current_variant_idx = \"0\";\nsess.last_variant_idx = \"0\";\nsess.recipient_name = null;\nsess.tariff_pending = null;\n// timezone оставляем (она полезна)\nsess.last_inline_message_id = sess.last_inline_message_id ?? null;\n\nreturn [{ json: { ...$json, session: sess } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1616,
+        0
+      ],
+      "id": "20beeb3d-7205-4ecf-9021-68046274fd6f",
+      "name": "START_FORCE_NEW__FN_RESET_SESSION"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "bcda2a6a-0087-41a6-ab24-75a5a8a224dd",
+              "leftValue": "={{ $node[\"START_NEW__FN_PARSE_SESSION1\"].json.session?.\nlast_inline_message_id }}",
+              "rightValue": "fake_",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {
+          "looseTypeValidation": true
+        }
+      },
+      "id": "9c8b8ffd-270d-40a4-b64c-68680a2dca41",
+      "name": "START__IF_HAS_LAST_INLINE3",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -368,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot8738651494:AAEEKr11vSTrb-5y602bhqsyOHWp1sN35x8/editMessageReplyMarkup",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  chat_id: $node[\"When Executed by Another Workflow\"].json.chat_id,\n  message_id: $node[\"When Executed by Another Workflow\"].json.session?.\nlast_inline_message_id,\n  reply_markup: { inline_keyboard: [] }\n} }}",
+        "options": {}
+      },
+      "id": "ea8e7ed9-7802-4db8-a54d-821dfb8fb419",
+      "name": "START__TG_EDIT_RM_LAST_INLINE4",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -144,
+        80
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        288,
+        16
+      ],
+      "id": "4ae5e507-ab41-4484-9f47-1313310a0afb",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -2720,
+        -16
+      ],
+      "id": "f7a091a3-6bcf-48d0-90c1-86e9c475a760",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "eUEULrK9LXoOY54R",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/eUEULrK9LXoOY54R",
+          "cachedResultName": "2_save_session_final"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        656,
+        16
+      ],
+      "id": "755debed-5b67-40de-bdc3-4d8fde68cd89",
+      "name": "Call '2_save_session_final'"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "96e778c9-dcdc-41c2-88d8-e86ca6e0ad6c",
+              "name": "session",
+              "value": "={{ $json.session }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        480,
+        16
+      ],
+      "id": "29ac2e0e-08c3-4294-8ce5-7dab4ffdfdd1",
+      "name": "Edit Fields",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -1840,
+        0
+      ],
+      "id": "78ce733c-bdff-44d9-b94c-ab304683bba1",
+      "name": "Merge1"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -1216,
+        16
+      ],
+      "id": "95b29dca-f882-4832-9a0d-394c73da08b8",
+      "name": "Merge2"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "PG_CREATE_REQUEST": {
+      "main": [
+        [
+          {
+            "node": "Merge2",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "REDIS_SET_SESSION": {
+      "main": [
+        [
+          {
+            "node": "START__IF_HAS_LAST_INLINE3",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TG_ASK_RECIPIENT_NAME": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "FN_SET_REQUEST_ID": {
+      "main": [
+        [
+          {
+            "node": "FN_SET_SESSION",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FN_SET_SESSION": {
+      "main": [
+        [
+          {
+            "node": "REDIS_SET_SESSION",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "START_NEW__REDIS_GET_SESSION1": {
+      "main": [
+        [
+          {
+            "node": "START_NEW__FN_PARSE_SESSION1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "START_NEW__FN_PARSE_SESSION1": {
+      "main": [
+        [
+          {
+            "node": "START_FORCE_NEW__PG_CLOSE_OLD",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "START_FORCE_NEW__PG_CLOSE_OLD": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "START_FORCE_NEW__FN_RESET_SESSION": {
+      "main": [
+        [
+          {
+            "node": "PG_CREATE_REQUEST",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "START__IF_HAS_LAST_INLINE3": {
+      "main": [
+        [
+          {
+            "node": "START__TG_EDIT_RM_LAST_INLINE4",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "TG_ASK_RECIPIENT_NAME",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "START__TG_EDIT_RM_LAST_INLINE4": {
+      "main": [
+        [
+          {
+            "node": "TG_ASK_RECIPIENT_NAME",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Call '2_save_session_final'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "START_NEW__REDIS_GET_SESSION1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge2": {
+      "main": [
+        [
+          {
+            "node": "FN_SET_REQUEST_ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge1": {
+      "main": [
+        [
+          {
+            "node": "START_FORCE_NEW__FN_RESET_SESSION",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "6e1e8b4f-d52f-451e-98ab-1e42a0cd1ee4",
+  "meta": {
+    "instanceId": "784907556f0c89efbde9ba288f0c0441c5b09242030c81d05d67aac99d485958"
+  },
+  "id": "CqKUFwn82ugJ8vt2",
+  "tags": []
+}

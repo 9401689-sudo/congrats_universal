@@ -1,0 +1,933 @@
+{
+  "name": "2_BUILD_PAYMENT",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "const session = $json.session ?? {};\n\n// Postgres node\nconst pgOut = $node[\"PAY199__PG_GET_REQUEST1\"]?.json ?? {};\n\n// PG может вернуть:\n// { id: ... }\n// { request: {...} }\n// [{...}]\nlet req;\n\nif (Array.isArray(pgOut)) {\n  req = pgOut[0];\n} else if (pgOut.request) {\n  req = pgOut.request;\n} else {\n  req = pgOut;\n}\n\nif (!req) {\n  throw new Error(\"PG_GET_REQUEST returned empty\");\n}\n\nconst tariff = String(session.tariff_pending ?? \"\").trim();\nif (!tariff) throw new Error(\"tariff_pending missing in session\");\n\n\n// ---- variant из Redis ----\nconst redisOut = $node[\"REDIS_GET_SESSION_TZ_PENDING1\"]?.json ?? {};\nconst raw = redisOut.value ?? redisOut.data ?? redisOut.result ?? redisOut;\n\nif (!raw) throw new Error(\"Selected variant missing in Redis\");\n\nlet variant_snapshot;\n\nif (typeof raw === \"object\" && raw !== null) {\n  variant_snapshot = raw;\n} else {\n  const s = String(raw).trim();\n  variant_snapshot = JSON.parse(s);\n}\n\nconst initiator_name =\n  String(session.tg_first_name ?? \"\").trim() || \"Инициатор\";\n\nreturn [{\n  json: {\n    ...$json,\n    request_id: String(req.id),\n    tariff,\n    initiator_name,\n    variant_snapshot,\n    payment_payload: {\n      provider: \"yookassa\",\n      yk: {\n        tariff\n      },\n      request_id: String(req.id),\n      tg_user_id: String(session.tg_user_id),\n      initiator_name,\n      selected_variant_idx: Number(req.selected_variant_idx),\n      variant_snapshot\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        320
+      ],
+      "id": "0109cbee-f74b-489c-a787-61f24c37054c",
+      "name": "FN_BUILD_YOOKASSA_PAYMENT_REQUEST"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.yookassa.ru/v3/payments",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "=Idempotence-Key",
+              "value": "={{$json.yk_idempotence_key}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n{\n  \"amount\": {\n    \"value\": $json.tariff === '199' ? '199.00' : '149.00',\n    \"currency\": \"RUB\"\n  },\n  \"capture\": true,\n  \"confirmation\": {\n    \"type\": \"redirect\",\n    \"return_url\": \"https://t.me/razresheno_buro_bot\"\n  },\n  \"description\": `Электронная открытка №${$json.session.active_request_id}`,\n  \"metadata\": {\n    \"request_id\": String($json.session.active_request_id),\n    \"tg_user_id\": String($json.session.tg_user_id),\n    \"tariff\": String($json.tariff)\n  },\n  \"receipt\": {\n    \"customer\": {\n      \"email\": $json.session.customer_email\n    },\n    \"items\": [\n      {\n        \"description\": \"Электронная открытка (Бюро Разрешено)\",\n        \"quantity\": \"1.00\",\n        \"amount\": {\n          \"value\": $json.tariff === '199' ? '199.00' : '149.00',\n          \"currency\": \"RUB\"\n        },\n        \"vat_code\": 1,\n        \"payment_subject\": \"service\",\n        \"payment_mode\": \"full_payment\"\n      }\n    ]\n  }\n}\n}}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "5063b254-8905-47ae-92ec-6b4a0f7d2e3f",
+      "name": "HTTP_CREATE_YOOKASSA_PAYMENT",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        704,
+        384
+      ],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "X0jl2m9BWKm00wLE",
+          "name": "Unnamed credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Ответ ЮKassa обычно лежит в $json (если n8n так настроен)\n// Иногда в $json.body. Подстрахуемся.\nconst resp = $json.body ?? $json;\n\nconst paymentId = resp.id;\nconst confirmationUrl = resp.confirmation?.confirmation_url;\nconst status = resp.status;\n\nif (!paymentId || !confirmationUrl) {\n  return [{\n    ok: false,\n    error_message: 'ЮKassa не вернула ссылку оплаты.',\n    debug: resp\n  }];\n}\n\nreturn [{\n  ...$json,\n  ok: true,\n  yk_payment_id: paymentId,\n  yk_status: status,\n  yk_confirmation_url: confirmationUrl\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        928,
+        384
+      ],
+      "id": "a885fe58-f440-469e-a87e-a16aef09aa3e",
+      "name": "FN_EXTRACT_CONFIRMATION_URL"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO razreshenobot.payments (\n  request_id,\n  payload,\n  amount,\n  provider_payment_charge_id\n)\nVALUES (\n  {{$json.request_id}}::bigint,\n  (\n    '{{ JSON.stringify($json.payment_payload || {}) }}'::jsonb\n    || jsonb_build_object(\n      'provider', 'yookassa',\n      'yk_payment_id', '{{$json.yk_payment_id}}',\n      'idempotence_key', '{{$json.yk_idempotence_key}}',\n      'tariff', '{{$json.tariff}}'\n    )\n  ),\n  {{$json.tariff === '149' ? 149 : 199}},\n  '{{$json.yk_payment_id}}'\n)\nRETURNING id;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2496,
+        336
+      ],
+      "id": "9c94ec4f-31c0-450e-8423-e78d30861f30",
+      "name": "PG_INSERT_PAYMENT_PENDING_YOOKASSA",
+      "credentials": {
+        "postgres": {
+          "id": "e36q5Gqlsldmqa0I",
+          "name": "Postgres razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot8738651494:AAEEKr11vSTrb-5y602bhqsyOHWp1sN35x8/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  chat_id: $node[\"When Executed by Another Workflow\"].json.chat_id,\n  text: \"Оплата подготовлена. Нажмите кнопку ниже:\",\n  reply_markup: {\n    inline_keyboard: [\n      [\n        {\n          text: \"💳 Оплатить\",\n          url: $json.yk_confirmation_url\n        }\n      ]\n    ]\n  }\n}) }}",
+        "options": {}
+      },
+      "id": "59945bfa-1e54-4614-aba1-fe4e113aebac",
+      "name": "TG_SEND_PAYLINK_MESSAGE",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        3552,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "bcda2a6a-0087-41a6-ab24-75a5a8a224dd",
+              "leftValue": "={{$json.need_email}}",
+              "rightValue": "fake_",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "0d18cfbc-a434-48e4-bdbd-2d2f2842b713",
+      "name": "START__IF_HAS_LAST_INLINE28",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -640,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "set",
+        "key": "=razresheno:sess:{{ $('When Executed by Another Workflow').item.json.session.tg_user_id }}",
+        "value": "={{ JSON.stringify($json.session) }}",
+        "expire": true,
+        "ttl": 86400
+      },
+      "id": "ce92aa3a-ba20-45ee-a655-38ce9ccf0652",
+      "name": "REDIS_SET_SESSION_TZ_PENDING_201",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        -416,
+        96
+      ],
+      "credentials": {
+        "redis": {
+          "id": "L8CJmx035hDrVPs3",
+          "name": "Redis razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $node[\"When Executed by Another Workflow\"].json.session.tg_user_id }}",
+        "text": "=🏛 Бюро «Разрешено»\n\nУкажите email для отправки чека. Это обязательное условие для оплаты.\nПример: name@example.com",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        448,
+        0
+      ],
+      "id": "bd7016d7-454d-418d-9626-0152390ac61f",
+      "name": "TG_SEND_NEED_START1",
+      "webhookId": "5c373b46-1eaa-426a-baad-de3b4e9cd37d",
+      "credentials": {
+        "telegramApi": {
+          "id": "DmBk1TBpQBNZCEiU",
+          "name": "Telegram razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "41e1e430-cdb5-4a10-a355-ae52c8fbeb62",
+      "name": "MERGE_SEAL_PICK7",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        1152,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "0dcae82b-b28b-4ef9-805f-98ea1d49cb96",
+      "name": "MERGE_SEAL_PICK8",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        2720,
+        272
+      ]
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        416,
+        320
+      ],
+      "typeVersion": 1,
+      "id": "e7cb1760-1089-4928-96f6-057a8d40b690",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select id, selected_variant_idx, recipient_name, delivery_method, delivery_username\nfrom razreshenobot.requests\nwhere id = $1;",
+        "options": {
+          "queryReplacement": "={{ Number($json.session.active_request_id) }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -416,
+        384
+      ],
+      "id": "5214b656-76cb-4357-b082-d5d5949d594c",
+      "name": "PAY199__PG_GET_REQUEST1",
+      "credentials": {
+        "postgres": {
+          "id": "e36q5Gqlsldmqa0I",
+          "name": "Postgres razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "5e3ca24f-7cbd-4e19-86f0-3d69c5690997",
+      "name": "MERGE_SEAL_PICK13",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        32,
+        320
+      ],
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "propertyName": "value",
+        "key": "={{ (() => {\n  // 1) пытаемся взять из PG-ноды (замени имя ноды на своё, если отличается!)\n  const pg = $node[\"PAY199__PG_GET_REQUEST1\"]?.json;\n\n  const row =\n    Array.isArray(pg) ? pg[0] :\n    (pg?.request ?? pg);\n\n  const reqId = row?.id ?? $json?.id ?? $json?.request_id ?? $json?.session?.active_request_id;\n  const sel  = row?.selected_variant_idx ?? $json?.selected_variant_idx ?? 1;\n\n  if (!reqId) return null; // чтобы сразу было видно, что нет request_id\n\n  return `razresheno:req:${reqId}:v:${sel}`;\n})() }}",
+        "keyType": "string",
+        "options": {}
+      },
+      "id": "3eb324e0-c47a-400b-90a6-fb8a821aa7c0",
+      "name": "REDIS_GET_SESSION_TZ_PENDING1",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        -192,
+        384
+      ],
+      "credentials": {
+        "redis": {
+          "id": "L8CJmx035hDrVPs3",
+          "name": "Redis razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const session = $json.session ?? {};\nconst reqId = String(session.active_request_id ?? \"0\");\nconst tg = String(session.tg_user_id ?? \"0\");\n\n// без crypto: Date.now + Math.random, но детерминировать не надо — просто уникально\nconst key = `${Date.now()}_${Math.floor(Math.random()*1e9)}_r${reqId}_u${tg}`;\n\nreturn [{\n  json: {\n    ...$json,\n    yk_idempotence_key: key\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        256,
+        320
+      ],
+      "id": "e32b1369-cbb7-47ad-9895-3234f191357c",
+      "name": "FN_MAKE_IDEMPOTENCE_KEY"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select id, selected_variant_idx\nfrom razreshenobot.requests\nwhere id = $1;",
+        "options": {
+          "queryReplacement": "={{ Number($json.session.active_request_id) }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1376,
+        272
+      ],
+      "id": "4ed838c5-cabe-40b6-868f-7da6c06e64d8",
+      "name": "PG_GET_REQUEST_FOR_PAY",
+      "credentials": {
+        "postgres": {
+          "id": "e36q5Gqlsldmqa0I",
+          "name": "Postgres razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "propertyName": "value",
+        "key": "={{ (() => {\n  // 1) пытаемся взять из PG-ноды (замени имя ноды на своё, если отличается!)\n  const pg = $node[\"PAY199__PG_GET_REQUEST1\"]?.json;\n\n  const row =\n    Array.isArray(pg) ? pg[0] :\n    (pg?.request ?? pg);\n\n  const reqId = row?.id ?? $json?.id ?? $json?.request_id ?? $json?.session?.active_request_id;\n  const sel  = row?.selected_variant_idx ?? $json?.selected_variant_idx ?? 1;\n\n  if (!reqId) return null; // чтобы сразу было видно, что нет request_id\n\n  return `razresheno:req:${reqId}:v:${sel}`;\n})() }}",
+        "options": {}
+      },
+      "id": "029cab2f-78f2-44f9-b15d-a8fbd05e7239",
+      "name": "REDIS_GET_SELECTED_VARIANT",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        1600,
+        272
+      ],
+      "credentials": {
+        "redis": {
+          "id": "L8CJmx035hDrVPs3",
+          "name": "Redis razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const session = $json.session ?? {};\n\n// 1) selected_variant_idx берём из текущего item, а не из PG\nconst selectedIdx = Number(\n  $json.selected_variant_idx ??\n  session.selected_variant_idx ??\n  session.current_variant_idx ??\n  session.last_variant_idx ??\n  1\n) || 1;\n\n// 2) variant из Redis GET (у тебя он реально приходит как value)\nconst redisOut = $node[\"REDIS_GET_SELECTED_VARIANT\"]?.json ?? {};\nconst raw = redisOut.value ?? redisOut.data ?? redisOut.result ?? null;\n\nif (!raw) throw new Error(\"Selected variant missing in Redis\");\n\nlet variant_snapshot;\nif (typeof raw === \"object\" && raw !== null) {\n  variant_snapshot = raw;\n} else {\n  const s = String(raw).trim();\n  if (!s) throw new Error(\"Redis returned empty string\");\n  variant_snapshot = JSON.parse(s);\n}\n\nreturn [{\n  json: {\n    ...$json,\n    selected_variant_idx: selectedIdx,\n    tg_user_id: String(session.tg_user_id ?? $json.tg_user_id ?? \"\"),\n    initiator_name: String(session.tg_first_name ?? \"\").trim() || \"Инициатор\",\n    variant_snapshot\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2272,
+        272
+      ],
+      "id": "d90de080-90eb-4f6b-828e-9aa559b8b31c",
+      "name": "FN_BUILD_PAYMENT_SNAPSHOT"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "cafdd709-e50b-4656-9613-8fca8c9230a6",
+      "name": "MERGE_SEAL_PICK14",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        1824,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "42562fdf-77b0-4655-8db1-876826337e2f",
+      "name": "MERGE_SEAL_PICK15",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        2048,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "bcda2a6a-0087-41a6-ab24-75a5a8a224dd",
+              "leftValue": "={{ $node[\"When Executed by Another Workflow\"].json.session.last_inline_message_id }}",
+              "rightValue": "fake_",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "4e02556a-ad20-4f87-a094-51d43eba4fa9",
+      "name": "START__IF_HAS_LAST_INLINE31",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -224,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot8738651494:AAEEKr11vSTrb-5y602bhqsyOHWp1sN35x8/editMessageReplyMarkup",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  chat_id: $node[\"When Executed by Another Workflow\"].json.chat_id,\n  message_id: $node[\"When Executed by Another Workflow\"].json.session?.last_inline_message_id,\n  reply_markup: { inline_keyboard: [] }\n} }}",
+        "options": {}
+      },
+      "id": "a51f5b50-1506-4266-905c-297311dd2073",
+      "name": "START__TG_EDIT_RM_LAST_INLINE31",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        0,
+        0
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "a1c85d5f-759e-4b75-8c1a-f24a573bc46f",
+      "name": "MERGE_SEAL_PICK16",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        224,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "bcda2a6a-0087-41a6-ab24-75a5a8a224dd",
+              "leftValue": "={{ $node[\"When Executed by Another Workflow\"].json.session.last_inline_message_id }}",
+              "rightValue": "fake_",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "e6e8d5fd-e889-4580-81fd-0c0a980e3025",
+      "name": "START__IF_HAS_LAST_INLINE33",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2896,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot8738651494:AAEEKr11vSTrb-5y602bhqsyOHWp1sN35x8/editMessageReplyMarkup",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  chat_id: $node[\"When Executed by Another Workflow\"].json.chat_id,\n  message_id: $node[\"When Executed by Another Workflow\"].json.session?.last_inline_message_id,\n  reply_markup: { inline_keyboard: [] }\n} }}",
+        "options": {}
+      },
+      "id": "311618f8-5244-4185-9b3e-31bfbb39d34e",
+      "name": "START__TG_EDIT_RM_LAST_INLINE32",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        3120,
+        192
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "87373165-a9b9-4e37-a079-294d157cf58a",
+      "name": "MERGE_SEAL_PICK17",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        3344,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const session = $json.session;\nif (!session) throw new Error('NO_SESSION');\n\nconst tariff = String($json.tariff ?? ''); // убедись, что тариф уже выставлен\nif (!tariff) throw new Error('NO_TARIFF_IN_PAY_FLOW');\n\n// где хранится email — мы выбрали session.customer_email\nconst email = String(session.customer_email ?? '').trim();\n\nif (!email) {\n  // ✅ вот тут ставим флаг\n  session.awaiting_email = true;\n\n  // чтобы после ввода email можно было продолжить оплату\n  session.tariff_pending = tariff;\n\n  return [{\n    ...$json,\n    session,\n    need_email: true\n  }];\n}\n\nreturn [{\n  ...$json,\n  session,\n  need_email: false\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -848,
+        240
+      ],
+      "id": "d0a5bfe7-5c46-4f7e-a90e-d6e5092a6e44",
+      "name": "PAY__FN_ENSURE_EMAIL"
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -1040,
+        240
+      ],
+      "id": "3ff619ee-7763-40b5-872c-f36865db56cc",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "eUEULrK9LXoOY54R",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/eUEULrK9LXoOY54R",
+          "cachedResultName": "2_save_session_final"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        3920,
+        272
+      ],
+      "id": "63f80004-9601-4693-8b66-055667817c0e",
+      "name": "Call '2_save_session_final'"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "FN_BUILD_YOOKASSA_PAYMENT_REQUEST": {
+      "main": [
+        [
+          {
+            "node": "HTTP_CREATE_YOOKASSA_PAYMENT",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "MERGE_SEAL_PICK7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP_CREATE_YOOKASSA_PAYMENT": {
+      "main": [
+        [
+          {
+            "node": "FN_EXTRACT_CONFIRMATION_URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FN_EXTRACT_CONFIRMATION_URL": {
+      "main": [
+        [
+          {
+            "node": "MERGE_SEAL_PICK7",
+            "type": "main",
+            "index": 1
+          },
+          {
+            "node": "MERGE_SEAL_PICK14",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PG_INSERT_PAYMENT_PENDING_YOOKASSA": {
+      "main": [
+        [
+          {
+            "node": "MERGE_SEAL_PICK8",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "START__IF_HAS_LAST_INLINE28": {
+      "main": [
+        [
+          {
+            "node": "REDIS_SET_SESSION_TZ_PENDING_201",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "MERGE_SEAL_PICK13",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "PAY199__PG_GET_REQUEST1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "REDIS_SET_SESSION_TZ_PENDING_201": {
+      "main": [
+        [
+          {
+            "node": "START__IF_HAS_LAST_INLINE31",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MERGE_SEAL_PICK7": {
+      "main": [
+        [
+          {
+            "node": "PG_GET_REQUEST_FOR_PAY",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "MERGE_SEAL_PICK15",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MERGE_SEAL_PICK8": {
+      "main": [
+        [
+          {
+            "node": "START__IF_HAS_LAST_INLINE33",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PAY199__PG_GET_REQUEST1": {
+      "main": [
+        [
+          {
+            "node": "REDIS_GET_SESSION_TZ_PENDING1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MERGE_SEAL_PICK13": {
+      "main": [
+        [
+          {
+            "node": "FN_MAKE_IDEMPOTENCE_KEY",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "REDIS_GET_SESSION_TZ_PENDING1": {
+      "main": [
+        [
+          {
+            "node": "MERGE_SEAL_PICK13",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "FN_MAKE_IDEMPOTENCE_KEY": {
+      "main": [
+        [
+          {
+            "node": "FN_BUILD_YOOKASSA_PAYMENT_REQUEST",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PG_GET_REQUEST_FOR_PAY": {
+      "main": [
+        [
+          {
+            "node": "REDIS_GET_SELECTED_VARIANT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "REDIS_GET_SELECTED_VARIANT": {
+      "main": [
+        [
+          {
+            "node": "MERGE_SEAL_PICK14",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "FN_BUILD_PAYMENT_SNAPSHOT": {
+      "main": [
+        [
+          {
+            "node": "PG_INSERT_PAYMENT_PENDING_YOOKASSA",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "MERGE_SEAL_PICK8",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MERGE_SEAL_PICK14": {
+      "main": [
+        [
+          {
+            "node": "MERGE_SEAL_PICK15",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "MERGE_SEAL_PICK15": {
+      "main": [
+        [
+          {
+            "node": "FN_BUILD_PAYMENT_SNAPSHOT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "START__IF_HAS_LAST_INLINE31": {
+      "main": [
+        [
+          {
+            "node": "START__TG_EDIT_RM_LAST_INLINE31",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "MERGE_SEAL_PICK16",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "START__TG_EDIT_RM_LAST_INLINE31": {
+      "main": [
+        [
+          {
+            "node": "MERGE_SEAL_PICK16",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "MERGE_SEAL_PICK16": {
+      "main": [
+        [
+          {
+            "node": "TG_SEND_NEED_START1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "START__IF_HAS_LAST_INLINE33": {
+      "main": [
+        [
+          {
+            "node": "START__TG_EDIT_RM_LAST_INLINE32",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "MERGE_SEAL_PICK17",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "START__TG_EDIT_RM_LAST_INLINE32": {
+      "main": [
+        [
+          {
+            "node": "MERGE_SEAL_PICK17",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "MERGE_SEAL_PICK17": {
+      "main": [
+        [
+          {
+            "node": "TG_SEND_PAYLINK_MESSAGE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PAY__FN_ENSURE_EMAIL": {
+      "main": [
+        [
+          {
+            "node": "START__IF_HAS_LAST_INLINE28",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "PAY__FN_ENSURE_EMAIL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TG_SEND_PAYLINK_MESSAGE": {
+      "main": [
+        [
+          {
+            "node": "Call '2_save_session_final'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "ce59582d-23e2-4dd0-b30b-bed502e3c910",
+  "meta": {
+    "instanceId": "784907556f0c89efbde9ba288f0c0441c5b09242030c81d05d67aac99d485958"
+  },
+  "id": "KYM4RrPOwEouYOyZ",
+  "tags": []
+}

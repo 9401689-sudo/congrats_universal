@@ -1,0 +1,1443 @@
+{
+  "name": "3_YOOKASSA_WEBHOOK",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "/yookassa/webhook",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        1440,
+        -480
+      ],
+      "id": "6970b43a-f0f8-49f3-b786-6c8b02e08b9e",
+      "name": "Webhook",
+      "webhookId": "ae9f2637-f140-44f9-8e11-7f541ed1445e"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body ?? $json;\n\nconst event = body.event;\nconst obj = body.object;\n\nif (!event || !obj?.id) {\n  throw new Error('BAD_WEBHOOK');\n}\n\nconst md = obj.metadata || {};\n\nreturn [{\n  event,\n  yk_payment_id: String(obj.id),\n  request_id: String(md.request_id || ''),\n  tg_user_id: String(md.tg_user_id || ''),\n  tariff: String(md.tariff || ''),\n  amount_value: String(obj.amount?.value || ''),\n  currency: String(obj.amount?.currency || '')\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1888,
+        -480
+      ],
+      "id": "82cded2a-2789-4243-8213-3c51e9a90db2",
+      "name": "WH__FN_PARSE_EVENT"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.event}}",
+                    "rightValue": "payment.succeeded",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "69e49e31-2edf-4630-b12c-42e057f37d25"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "d0716c18-8557-4f9b-bf5f-55bb3257e471",
+                    "leftValue": "={{$json.event}}",
+                    "rightValue": "payment.canceled",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        2336,
+        -480
+      ],
+      "id": "cfa13ca9-719d-449b-89fc-67efd32a733c",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot8738651494:AAEEKr11vSTrb-5y602bhqsyOHWp1sN35x8/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n({\n  chat_id: Number($json.tg_user_id),\n  text: ($json.tariff === '199')\n    ? 'Оплата получена ✅\\nДокумент будет отправлен вам 8 марта в 09:00 по выбранной таймзоне.'\n    : 'Оплата получена ✅\\nДокумент вступает в силу немедленно. Обжалованию не подлежит.',\n})\n}}",
+        "options": {}
+      },
+      "id": "93ba595a-1a97-46fd-9d1c-10cde4c5f727",
+      "name": "WH__TG_SEND_SUCCESS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        6960,
+        -384
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE razreshenobot.payments\nSET\n  payload = payload || jsonb_build_object('yookassa_event', 'payment.canceled')\nWHERE (payload->>'yk_payment_id') = '{{$json.yk_payment_id}}';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2560,
+        -352
+      ],
+      "id": "6a247c81-db76-427e-8ee0-35a3c70003c6",
+      "name": "WH__PG_MARK_PAYMENT_CANCELED",
+      "credentials": {
+        "postgres": {
+          "id": "e36q5Gqlsldmqa0I",
+          "name": "Postgres razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "Number($json.initiator_tg_user_id)",
+        "text": "=Оплата отменена. Можно попробовать снова.",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2784,
+        -352
+      ],
+      "id": "0fa3dba1-4376-4cda-b548-a299679cb7b4",
+      "name": "Send a text message",
+      "webhookId": "264fb8af-34c1-483a-a6f9-eaed6c3d28ae",
+      "credentials": {
+        "telegramApi": {
+          "id": "DmBk1TBpQBNZCEiU",
+          "name": "Telegram razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "865a067d-5997-48f4-966b-23b04cba401d",
+      "name": "MERGE_SEAL_PICK2",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        4864,
+        -144
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "f72aae36-c8a2-4129-8428-04449f50fb71",
+      "name": "MERGE_SEAL_PICK3",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        5312,
+        -144
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "bcda2a6a-0087-41a6-ab24-75a5a8a224dd",
+              "leftValue": "={{ $json.session.last_inline_message_id }}",
+              "rightValue": "fake_",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "e8559fc7-faf8-41bc-9f11-82e04b8cd1e5",
+      "name": "START__IF_HAS_LAST_INLINE27",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        6288,
+        -384
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot8738651494:AAEEKr11vSTrb-5y602bhqsyOHWp1sN35x8/editMessageReplyMarkup",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  chat_id: $node[\"FN_NORMALIZE\"].json.chat_id,\n  message_id: $node[\"START__IF_HAS_LAST_INLINE27\"].json.session?.last_inline_message_id,\n  reply_markup: { inline_keyboard: [] }\n} }}",
+        "options": {}
+      },
+      "id": "4caeeab8-1a0f-49d9-9d83-bda3dd0ceadf",
+      "name": "START__TG_EDIT_RM_LAST_INLINE27",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        6832,
+        -560
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "1d2b2649-1668-4989-8a23-c0a699e7679e",
+      "name": "MERGE_SEAL_PICK4",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        6736,
+        -448
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "propertyName": "variant_raw",
+        "key": "=razresheno:sess:{{ $json.initiator_tg_user_id }}",
+        "options": {
+          "dotNotation": true
+        }
+      },
+      "id": "918349d6-4596-4380-9c2e-743b07dd9726",
+      "name": "START__REDIS_GET_SESSION_FOR_INLINE",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        5616,
+        -288
+      ],
+      "credentials": {
+        "redis": {
+          "id": "L8CJmx035hDrVPs3",
+          "name": "Redis razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// START__FN_PARSE_SESSION_FOR_INLINE (универсальный)\n\n// где может лежать строка/объект сессии\nconst raw =\n  $json.session ??\n  $json.variant_raw ??          // <-- ВАЖНО: твой текущий кейс\n  $json.redis?.session ??\n  $json.redis?.data ??\n  $json.data ??\n  $json.session_raw ??\n  null;\n\nlet sess = {};\n\ntry {\n  let parsed = raw;\n\n  // если пришёл объект — ок\n  // если пришла строка — парсим (иногда бывает \"JSON в JSON\", поэтому два раза)\n  if (typeof parsed === \"string\") parsed = JSON.parse(parsed);\n  if (typeof parsed === \"string\") parsed = JSON.parse(parsed);\n\n  // иногда PG/Redis возвращают массив строк/объектов\n  if (Array.isArray(parsed)) parsed = parsed[0];\n\n  if (parsed && typeof parsed === \"object\" && !Array.isArray(parsed)) {\n    sess = parsed;\n  }\n} catch (e) {\n  sess = {};\n}\n\n// дефолты/нормализация\nsess.active_request_id = sess.active_request_id ?? null;\nsess.awaiting = sess.awaiting ?? \"none\";\nsess.current_variant_idx = sess.current_variant_idx ?? \"0\";\nsess.last_variant_idx = sess.last_variant_idx ?? \"0\";\nsess.recipient_name = sess.recipient_name ?? null;\nsess.last_inline_message_id = sess.last_inline_message_id ?? null;\n\nreturn [{ json: { ...$json, session: sess } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5840,
+        -288
+      ],
+      "id": "a794d2de-1937-41e3-ab2e-b02ff829822e",
+      "name": "START__FN_PARSE_SESSION_FOR_INLINE"
+    },
+    {
+      "parameters": {
+        "jsCode": "const tariff = String($json.tariff);\nconst request_id = String($json.request_id);\n\nif (!request_id || !tariff) throw new Error('NO_METADATA');\n\nif ($json.currency !== 'RUB') throw new Error('BAD_CURRENCY');\n\nconst expected = tariff === '149' ? '149.00' : '199.00';\nif (String($json.amount_value) !== expected) throw new Error('BAD_AMOUNT');\n\nreturn [$json];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2560,
+        -576
+      ],
+      "id": "0a55b224-f055-46ce-9ec3-19bee86f65d4",
+      "name": "WH__FN_VALIDATE"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO razreshenobot.payments (\n  request_id,\n  payload,\n  amount,\n  status,\n  paid_at,\n  provider_payment_charge_id\n)\nVALUES (\n  {{$json.request_id}}::bigint,\n  jsonb_build_object(\n    'provider', 'yookassa',\n    'yk_payment_id', '{{$json.yk_payment_id}}',\n    'tariff', '{{$json.tariff}}',\n    'tg_user_id', '{{$json.tg_user_id}}'\n  ),\n  {{$json.tariff === '149' ? 149 : 199}},\n  'paid'::public.payment_status,\n  now(),\n  '{{$json.yk_payment_id}}'\n)\nON CONFLICT (provider_payment_charge_id)\nDO UPDATE SET\n  status = 'paid'::public.payment_status,\n  paid_at = COALESCE(razreshenobot.payments.paid_at, now())\nRETURNING id, request_id;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2784,
+        -544
+      ],
+      "id": "7abb67c5-2623-4c9a-ac69-5fd78f6e7ef0",
+      "name": "WH__PG_UPSERT_PAYMENT_PAID",
+      "credentials": {
+        "postgres": {
+          "id": "e36q5Gqlsldmqa0I",
+          "name": "Postgres razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "insert into razreshenobot.documents\n(request_id, tariff, initiator_name, render_params)\nvalues ($1, $2::public.document_tariff, $3, $4::jsonb)\non conflict (request_id, tariff)\ndo update set\n  initiator_name = excluded.initiator_name,\n  render_params = excluded.render_params\nreturning *;",
+        "options": {
+          "queryReplacement": "={{ Number($json.request_id) }}, {{ $json.tariff }}, {{ $json.initiator_name }}, {{ JSON.stringify($json.render_params) }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        3456,
+        -544
+      ],
+      "id": "81a8be49-ca8b-4ac2-b025-d59d31a6c076",
+      "name": "WH__PG_UPSERT_DOCUMENT",
+      "credentials": {
+        "postgres": {
+          "id": "e36q5Gqlsldmqa0I",
+          "name": "Postgres razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ ...$json, document_id: $json.id }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3904,
+        -576
+      ],
+      "id": "62689200-f42e-4af3-998f-22e3b7c5449f",
+      "name": "WH__FN_SET_DOCUMENT_ID1"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "1afb58de-922b-4de4-aea9-c635ab148041",
+      "name": "MERGE_SEAL_PICK",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        3008,
+        -576
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "a5e7ecde-37b1-49d5-ad08-d70d55ab228f",
+      "name": "MERGE_SEAL_PICK5",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        3680,
+        -576
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "d777340f-27d3-4672-9fca-73b8684197d1",
+      "name": "MERGE_SEAL_PICK6",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        6064,
+        -384
+      ]
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        2496,
+        -576
+      ],
+      "typeVersion": 1,
+      "id": "1c3a1240-8de6-45c1-a296-cb1d579a5ec6",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "jsCode": "const token = String($json.query?.token ?? '').trim();\n\n// Впиши свой токен прямо сюда:\nconst expected = '222458e391bbf910897d669d5fa00b5fc61f9093ed6e38ec45b68cec5209350d';\n\nif (token !== expected) {\n  // Важно: тут лучше не продолжать workflow\n  throw new Error('BAD_TOKEN');\n}\n\nreturn [$json];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1664,
+        -480
+      ],
+      "id": "d25f82b5-1f6d-4d19-b7d7-b05b8e2cc89d",
+      "name": "WH__FN_VERIFY_TOKEN"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select *\nfrom razreshenobot.payments\nwhere provider_payment_charge_id = $1\nlimit 1;",
+        "options": {
+          "queryReplacement": "={{ $json.yk_payment_id }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        2016,
+        -336
+      ],
+      "id": "9ac925ea-64bd-44e8-8a5a-055e889073bc",
+      "name": "PG_GET_PAYMENT_BY_PROVIDER_ID",
+      "credentials": {
+        "postgres": {
+          "id": "e36q5Gqlsldmqa0I",
+          "name": "Postgres razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const pay = $node[\"PG_GET_PAYMENT_BY_PROVIDER_ID\"].json[0] ?? $node[\"PG_GET_PAYMENT_BY_PROVIDER_ID\"].json;\n\nif (!pay) throw new Error(\"Payment not found in DB\");\n\nconst payload = pay.payload ?? {};\nconst variant = payload.variant_snapshot;\n\nif (!variant) throw new Error(\"variant_snapshot missing in payment.payload\");\n\nconst requestId = String(pay.request_id);\nconst tariff = String(payload.tariff ?? \"149\");\nconst initiatorName = String(payload.initiator_name ?? \"Инициатор\");\nconst tgUserId = String(payload.tg_user_id ?? \"\");\n\nconst seed = `${requestId}:final`;\nlet h = 0;\nfor (const ch of seed) h = (h * 31 + ch.charCodeAt(0)) >>> 0;\nconst docNo = `0803-${(h % 900) + 100}`;\n\nconst render_params = {\n  mode: \"final\",\n  templates_dir: \"/mnt/razresheno/templates\",\n  bg: variant.bg,\n  doc_no: docNo,\n  recipient_name: variant.recipient_name,\n  initiator_name: initiatorName,\n\n  header_small: \"Специальный выпуск к 8 марта\\nРегламентирующая инстанция «РАЗРЕШЕНО»\",\n  title: \"РАЗРЕШЕНО\",\n  subtitle: `ОФИЦИАЛЬНЫЙ ДОКУМЕНТ № ${docNo}`,\n  intro: variant.content.intro,\n  points: variant.content.points,\n\n  footer_lines: [\"Вступает в силу немедленно.\", \"Обжалованию не подлежит.\"],\n  watermark_lines: [],\n  source_line: \"Источник оформления: razresheno\",\n  qr_url: \"https://t.me/razresheno_buro_bot?start=docqr\",\n  text_block_y: 760,\n\n  layout: variant.layout\n};\n\nreturn [{\n  json: {\n    ...$json,\n    request_id: requestId,\n    tariff,\n    tg_user_id: tgUserId,\n    initiator_name: initiatorName,\n    render_params\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3232,
+        -576
+      ],
+      "id": "9af5bda3-8bf5-4a99-b304-c23c14389feb",
+      "name": "FN_BUILD_DOCUMENT_FROM_PAYMENT"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "001c2129-011f-4cca-abc9-c857165dadce",
+              "leftValue": "={{$json.tariff}}",
+              "rightValue": "149",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {
+          "ignoreCase": true
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        4128,
+        -576
+      ],
+      "id": "2385dde2-12c1-4d11-a774-ec84db0a0409",
+      "name": "WH__IF_TARIFF_149"
+    },
+    {
+      "parameters": {
+        "jsCode": "const requestId = String($json.request_id ?? \"\");\nconst documentId = String($json.document_id ?? \"\");\n\nif (!requestId) throw new Error(\"request_id missing\");\nif (!documentId) throw new Error(\"document_id missing\");\n\nconst inPath = `/opt/razresheno/renders/tmp/req${requestId}_final.json`;\nconst outLocal = `/opt/razresheno/renders/final/req${requestId}_final.png`;\n\nconst renderJson = {\n  ...($json.render_params ?? {}),\n  output_path: outLocal\n};\n\nreturn [{\n  json: {\n    ...$json,\n    document_id: documentId,\n    inPath,\n    outLocal,\n    renderJson\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4352,
+        -736
+      ],
+      "id": "af6351b4-c0d6-475d-897e-3161d6f5d85e",
+      "name": "FN_BUILD_FINAL_PATHS_149"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{\n  json: {\n    ...$json,\n    renderJsonText: JSON.stringify($json.renderJson)\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4576,
+        -736
+      ],
+      "id": "32c36223-15f0-4d20-bdc8-d51a8cf4f3ed",
+      "name": "FN_STRINGIFY_FINAL_JSON"
+    },
+    {
+      "parameters": {
+        "command": "=set -e\nmkdir -p /opt/razresheno/renders/tmp\nmkdir -p /opt/razresheno/renders/final\nprintf '%s' '{{$json.renderJsonText}}' > \"{{$json.inPath}}\""
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        4864,
+        -688
+      ],
+      "id": "3910daa4-3b5d-48ab-8ac6-a09edde1b2e2",
+      "name": "CMD_WRITE_FINAL_JSON",
+      "credentials": {
+        "sshPassword": {
+          "id": "gEHoJf4PNQBaO9SP",
+          "name": "SSH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "=set -e\necho \"INPUT_JSON={{$json.inPath}}\"\necho \"OUTPUT_FILE={{$json.outLocal}}\"\n\ntest -f \"{{$json.inPath}}\" || (echo \"NO_INPUT_JSON {{$json.inPath}}\" >&2; exit 31)\n\nmkdir -p /opt/razresheno/renders/final\n\n/opt/razresheno/venv/bin/python /opt/razresheno/render_doc.py \"{{$json.inPath}}\"\n\ntest -f \"{{$json.outLocal}}\" || (echo \"NO_FINAL_FILE {{$json.outLocal}}\" >&2; exit 32)\ntest -r \"{{$json.outLocal}}\" || (echo \"FINAL_NOT_READABLE {{$json.outLocal}}\" >&2; exit 33)\n\nls -la \"{{$json.outLocal}}\""
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        5248,
+        -704
+      ],
+      "id": "06d928c3-014b-44c7-97bc-3ef900cb856b",
+      "name": "CMD_RENDER_FINAL",
+      "credentials": {
+        "sshPassword": {
+          "id": "gEHoJf4PNQBaO9SP",
+          "name": "SSH"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "command": "=set -e\nTOKEN=\"$(cat /opt/razresheno/secrets/tg_bot_token)\"\nFILE=\"{{$json.outLocal}}\"\nCHAT=\"{{$json.tg_user_id}}\"\nOUT=\"/opt/razresheno/renders/tmp/tg_send_149_{{$json.request_id}}.json\"\n\ncurl -sS -X POST \"https://api.telegram.org/bot$TOKEN/sendDocument\" \\\n  -F \"chat_id=$CHAT\" \\\n  -F \"document=@$FILE\" \\\n  -F \"caption=Документ заверен.\\nВступает в силу немедленно.\\nОбжалованию не подлежит.\" \\\n  > \"$OUT\"\n\ncat \"$OUT\""
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        5808,
+        -672
+      ],
+      "id": "acbf7999-ad38-4c02-9814-cbe4dcca3d1f",
+      "name": "CMD_TG_SEND_FINAL_149",
+      "credentials": {
+        "sshPassword": {
+          "id": "gEHoJf4PNQBaO9SP",
+          "name": "SSH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $node[\"CMD_TG_SEND_FINAL_149\"].json.stdout ?? \"\";\nif (!raw) throw new Error(\"Telegram send response empty\");\n\nlet j;\ntry {\n  j = JSON.parse(raw);\n} catch (e) {\n  throw new Error(\"Telegram response is not JSON: \" + raw.slice(0, 300));\n}\n\nif (!j.ok) {\n  throw new Error(\"Telegram send failed: \" + JSON.stringify(j));\n}\n\nconst fileId = j.result?.document?.file_id;\nconst messageId = j.result?.message_id;\n\nif (!fileId) throw new Error(\"No document.file_id in Telegram response\");\n\nreturn [{\n  json: {\n    ...$json,\n    final_file_id: fileId,\n    tg_message_id: messageId\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6064,
+        -832
+      ],
+      "id": "df77f75c-9389-4fa2-a9d3-65d145825919",
+      "name": "FN_PARSE_TG_SEND_149"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "update razreshenobot.documents\nset final_file_id = $1\nwhere id = $2::bigint;",
+        "options": {
+          "queryReplacement": "={{ $json.final_file_id }}, {{ Number($json.document_id) }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        6224,
+        -736
+      ],
+      "id": "1dd353a9-c381-4104-b877-719e550e50ef",
+      "name": "PG_UPDATE_DOCUMENT_FILE_ID_149",
+      "credentials": {
+        "postgres": {
+          "id": "e36q5Gqlsldmqa0I",
+          "name": "Postgres razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "update razreshenobot.requests\nset\n  status = 'closed'::public.request_status,\n  closed_at = now()\nwhere id = $1::bigint;",
+        "options": {
+          "queryReplacement": "={{ Number($json.request_id) }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        6512,
+        -832
+      ],
+      "id": "1759e0bd-f115-4b9b-9af4-ec84334af0f4",
+      "name": "PG_CLOSE_REQUEST_149",
+      "credentials": {
+        "postgres": {
+          "id": "e36q5Gqlsldmqa0I",
+          "name": "Postgres razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const payload = $json.payload ?? {};\nconst tariff = String(payload.tariff ?? $json.tariff ?? \"199\");\n\nif (tariff !== \"199\") {\n  return [{\n    json: {\n      ...$json,\n      skip_delivery: true\n    }\n  }];\n}\n\nconst documentId = String($json.document_id ?? \"\");\nconst requestId = String($json.request_id ?? \"\");\n\nif (!documentId) throw new Error(\"document_id missing\");\nif (!requestId) throw new Error(\"request_id missing\");\n\nreturn [{\n  json: {\n    ...$json,\n    document_id: documentId,\n    request_id: requestId\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4336,
+        -512
+      ],
+      "id": "e5d5e861-8804-4ce3-9a38-747dd31df7d8",
+      "name": "FN_BUILD_DELIVERY_199"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select *\nfrom razreshenobot.requests\nwhere id = $1::bigint\nlimit 1;",
+        "options": {
+          "queryReplacement": "={{ Number($json.request_id) }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        4480,
+        -336
+      ],
+      "id": "3e7a365c-8880-43f1-9300-5c6f986f7705",
+      "name": "PG_GET_REQUEST_FOR_DELIVERY",
+      "credentials": {
+        "postgres": {
+          "id": "e36q5Gqlsldmqa0I",
+          "name": "Postgres razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const req = $node[\"PG_GET_REQUEST_FOR_DELIVERY\"].json[0] ?? $node[\"PG_GET_REQUEST_FOR_DELIVERY\"].json;\nif (!req) throw new Error(\"Request missing for delivery\");\n\nconst method = req.delivery_method && req.delivery_method !== \"none\"\n  ? req.delivery_method\n  : \"manual\";\n\nconst username = req.delivery_username ?? null;\n\nconst scheduled_at = \"2026-03-08T06:00:00.000Z\";\n\nreturn [{\n  json: {\n    ...$json,\n    delivery_method: method,\n    recipient_username: username,\n    scheduled_at\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4720,
+        -496
+      ],
+      "id": "dc15d001-4db0-4d74-967b-897785bb6644",
+      "name": "FN_BUILD_SCHEDULED_AT_199"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "insert into razreshenobot.deliveries\n(document_id, scheduled_at, delivery_method, recipient_username)\nvalues ($1::bigint, $2::timestamptz, $3::public.delivery_method, $4)\non conflict (document_id) do nothing\nreturning *;",
+        "options": {
+          "queryReplacement": "={{ Number($json.document_id) }}, {{ $json.scheduled_at }}, {{ $json.delivery_method }}, {{ $json.recipient_username }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        4864,
+        -368
+      ],
+      "id": "7cd936e4-5113-4fa8-b437-abc64ed033db",
+      "name": "PG_INSERT_DELIVERY_199",
+      "credentials": {
+        "postgres": {
+          "id": "e36q5Gqlsldmqa0I",
+          "name": "Postgres razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "update razreshenobot.requests\nset\n  status = 'closed'::public.request_status,\n  closed_at = now()\nwhere id = $1::bigint;",
+        "options": {
+          "queryReplacement": "={{ Number($json.request_id) }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        5184,
+        -496
+      ],
+      "id": "41106913-70d7-41c4-b930-4b613755e17f",
+      "name": "PG_CLOSE_REQUEST_199",
+      "credentials": {
+        "postgres": {
+          "id": "e36q5Gqlsldmqa0I",
+          "name": "Postgres razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "3b39e24e-4d42-4cc5-b57a-5f37aa5b75bd",
+      "name": "MERGE_SEAL_PICK1",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        2160,
+        -480
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "8515cffe-f441-45bb-a850-4f3f4d8f99ba",
+      "name": "MERGE_SEAL_PICK7",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        4544,
+        -512
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "8319db7f-7824-4c31-ae66-1e2f47532736",
+      "name": "MERGE_SEAL_PICK8",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        5920,
+        -816
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "b35b6697-481b-49a6-9835-9793fc79b21f",
+      "name": "MERGE_SEAL_PICK9",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        5424,
+        -816
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "193c34ca-1e0d-4d08-97d7-000cfbbf9899",
+      "name": "MERGE_SEAL_PICK10",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        5024,
+        -832
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "e4509c3c-feca-48ce-a57f-ac6c600859b8",
+      "name": "MERGE_SEAL_PICK11",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        6352,
+        -832
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "b8ad5cb2-8be6-45dd-a7fc-1dcf9e38bade",
+      "name": "MERGE_SEAL_PICK12",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        5008,
+        -496
+      ]
+    },
+    {
+      "parameters": {
+        "command": "=set -e\n\nSRC=\"{{$json.outLocal}}\"\nDST=\"/mnt/razresheno/renders/final/$(basename \"$SRC\")\"\n\nmkdir -p /mnt/razresheno/renders/final\n\ncp \"$SRC\" \"$DST\"\n\nls -la \"$DST\""
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        5536,
+        -672
+      ],
+      "id": "3df98c02-b4af-45ca-97fd-8ec5b2064153",
+      "name": "CMD_COPY_FINAL_TO_NEXTCLOUD",
+      "credentials": {
+        "sshPassword": {
+          "id": "JhAjso9ApJbtaT8r",
+          "name": "SSH Password account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "52ac560e-1de6-4adf-91a9-212861a6d03a",
+      "name": "MERGE_SEAL_PICK13",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        5680,
+        -816
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "WH__FN_VERIFY_TOKEN",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WH__FN_PARSE_EVENT": {
+      "main": [
+        [
+          {
+            "node": "MERGE_SEAL_PICK1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "PG_GET_PAYMENT_BY_PROVIDER_ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "WH__FN_VALIDATE",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "WH__PG_MARK_PAYMENT_CANCELED",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WH__PG_MARK_PAYMENT_CANCELED": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MERGE_SEAL_PICK2": {
+      "main": [
+        [
+          {
+            "node": "MERGE_SEAL_PICK3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MERGE_SEAL_PICK3": {
+      "main": [
+        [
+          {
+            "node": "START__REDIS_GET_SESSION_FOR_INLINE",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "MERGE_SEAL_PICK6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "START__IF_HAS_LAST_INLINE27": {
+      "main": [
+        [
+          {
+            "node": "START__TG_EDIT_RM_LAST_INLINE27",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "MERGE_SEAL_PICK4",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "WH__TG_SEND_SUCCESS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "START__TG_EDIT_RM_LAST_INLINE27": {
+      "main": [
+        [
+          {
+            "node": "MERGE_SEAL_PICK4",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "MERGE_SEAL_PICK4": {
+      "main": [
+        [
+          {
+            "node": "WH__TG_SEND_SUCCESS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "START__REDIS_GET_SESSION_FOR_INLINE": {
+      "main": [
+        [
+          {
+            "node": "START__FN_PARSE_SESSION_FOR_INLINE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "START__FN_PARSE_SESSION_FOR_INLINE": {
+      "main": [
+        [
+          {
+            "node": "MERGE_SEAL_PICK6",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "WH__FN_VALIDATE": {
+      "main": [
+        [
+          {
+            "node": "MERGE_SEAL_PICK",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "WH__PG_UPSERT_PAYMENT_PAID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WH__PG_UPSERT_PAYMENT_PAID": {
+      "main": [
+        [
+          {
+            "node": "MERGE_SEAL_PICK",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "WH__PG_UPSERT_DOCUMENT": {
+      "main": [
+        [
+          {
+            "node": "MERGE_SEAL_PICK5",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "WH__FN_SET_DOCUMENT_ID1": {
+      "main": [
+        [
+          {
+            "node": "WH__IF_TARIFF_149",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MERGE_SEAL_PICK": {
+      "main": [
+        [
+          {
+            "node": "FN_BUILD_DOCUMENT_FROM_PAYMENT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MERGE_SEAL_PICK5": {
+      "main": [
+        [
+          {
+            "node": "WH__FN_SET_DOCUMENT_ID1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MERGE_SEAL_PICK6": {
+      "main": [
+        [
+          {
+            "node": "START__IF_HAS_LAST_INLINE27",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WH__FN_VERIFY_TOKEN": {
+      "main": [
+        [
+          {
+            "node": "WH__FN_PARSE_EVENT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PG_GET_PAYMENT_BY_PROVIDER_ID": {
+      "main": [
+        [
+          {
+            "node": "MERGE_SEAL_PICK1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "FN_BUILD_DOCUMENT_FROM_PAYMENT": {
+      "main": [
+        [
+          {
+            "node": "MERGE_SEAL_PICK5",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "WH__PG_UPSERT_DOCUMENT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WH__IF_TARIFF_149": {
+      "main": [
+        [
+          {
+            "node": "FN_BUILD_FINAL_PATHS_149",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "FN_BUILD_DELIVERY_199",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FN_BUILD_FINAL_PATHS_149": {
+      "main": [
+        [
+          {
+            "node": "FN_STRINGIFY_FINAL_JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FN_STRINGIFY_FINAL_JSON": {
+      "main": [
+        [
+          {
+            "node": "CMD_WRITE_FINAL_JSON",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "MERGE_SEAL_PICK10",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CMD_WRITE_FINAL_JSON": {
+      "main": [
+        [
+          {
+            "node": "MERGE_SEAL_PICK10",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "CMD_RENDER_FINAL": {
+      "main": [
+        [
+          {
+            "node": "MERGE_SEAL_PICK9",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "CMD_TG_SEND_FINAL_149": {
+      "main": [
+        [
+          {
+            "node": "MERGE_SEAL_PICK8",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "FN_PARSE_TG_SEND_149": {
+      "main": [
+        [
+          {
+            "node": "PG_UPDATE_DOCUMENT_FILE_ID_149",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "MERGE_SEAL_PICK11",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PG_UPDATE_DOCUMENT_FILE_ID_149": {
+      "main": [
+        [
+          {
+            "node": "MERGE_SEAL_PICK11",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "FN_BUILD_DELIVERY_199": {
+      "main": [
+        [
+          {
+            "node": "PG_GET_REQUEST_FOR_DELIVERY",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "MERGE_SEAL_PICK7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PG_GET_REQUEST_FOR_DELIVERY": {
+      "main": [
+        [
+          {
+            "node": "MERGE_SEAL_PICK7",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "FN_BUILD_SCHEDULED_AT_199": {
+      "main": [
+        [
+          {
+            "node": "PG_INSERT_DELIVERY_199",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "MERGE_SEAL_PICK12",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PG_INSERT_DELIVERY_199": {
+      "main": [
+        [
+          {
+            "node": "MERGE_SEAL_PICK12",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "PG_CLOSE_REQUEST_199": {
+      "main": [
+        []
+      ]
+    },
+    "MERGE_SEAL_PICK1": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MERGE_SEAL_PICK7": {
+      "main": [
+        [
+          {
+            "node": "FN_BUILD_SCHEDULED_AT_199",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MERGE_SEAL_PICK8": {
+      "main": [
+        [
+          {
+            "node": "FN_PARSE_TG_SEND_149",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MERGE_SEAL_PICK10": {
+      "main": [
+        [
+          {
+            "node": "MERGE_SEAL_PICK9",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "CMD_RENDER_FINAL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MERGE_SEAL_PICK9": {
+      "main": [
+        [
+          {
+            "node": "CMD_COPY_FINAL_TO_NEXTCLOUD",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "MERGE_SEAL_PICK13",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MERGE_SEAL_PICK11": {
+      "main": [
+        [
+          {
+            "node": "PG_CLOSE_REQUEST_149",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MERGE_SEAL_PICK12": {
+      "main": [
+        [
+          {
+            "node": "PG_CLOSE_REQUEST_199",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CMD_COPY_FINAL_TO_NEXTCLOUD": {
+      "main": [
+        [
+          {
+            "node": "MERGE_SEAL_PICK13",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "MERGE_SEAL_PICK13": {
+      "main": [
+        [
+          {
+            "node": "MERGE_SEAL_PICK8",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "CMD_TG_SEND_FINAL_149",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "cacfec26-48a1-41cc-beff-97223eea4c07",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "784907556f0c89efbde9ba288f0c0441c5b09242030c81d05d67aac99d485958"
+  },
+  "id": "hE3cvZQKUtFPyh3F",
+  "tags": []
+}

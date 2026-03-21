@@ -1,0 +1,349 @@
+{
+  "name": "2_DELIV_USERNAME",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "get",
+        "propertyName": "session",
+        "key": "=razresheno:sess:{{ $('When Executed by Another Workflow').item.json.tg_user_id }}",
+        "options": {
+          "dotNotation": true
+        }
+      },
+      "id": "cd83f122-b8de-4dab-9114-1d3716798725",
+      "name": "PAY__REDIS_GET_SESSION2",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        -1120,
+        224
+      ],
+      "credentials": {
+        "redis": {
+          "id": "L8CJmx035hDrVPs3",
+          "name": "Redis razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw =\n  $json.session ??\n  $json.data ??\n  $json.redis?.session ??\n  $json.redis?.data ??\n  null;\n\nlet sess = {};\ntry {\n  sess = raw ? JSON.parse(raw) : {};\n} catch (e) {\n  sess = {};\n}\n\n// --- Гарантируем структуру ---\nif (!sess || typeof sess !== 'object') {\n  sess = {};\n}\n\n// Обязательные поля\nsess.active_request_id = sess.active_request_id ?? null;\nsess.awaiting = sess.awaiting ?? \"none\";\nsess.recipient_name = sess.recipient_name ?? null;\nsess.current_variant_idx = sess.current_variant_idx ?? \"0\";\nsess.last_variant_idx = sess.last_variant_idx ?? \"0\";\n\n// Новые поля для TZ логики\nsess.initiator_timezone = sess.initiator_timezone ?? null;\nsess.tariff_pending = sess.tariff_pending ?? null;\n\nreturn [{\n  json: {\n    ...$json,\n    session: sess,                  // <- ВАЖНО: возвращаем весь session\n    active_request_id: sess.active_request_id // оставляем для совместимости\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -896,
+        224
+      ],
+      "id": "3be7c066-3fad-4c03-8139-cd82475e6aaf",
+      "name": "PAY__FN_PARSE_SESSION2"
+    },
+    {
+      "parameters": {
+        "jsCode": "const session = $json.session;\nsession.awaiting = 'delivery_username';\nsession.tariff_pending = '199';\nreturn [{ ...$json, session }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -672,
+        224
+      ],
+      "id": "c84085fd-3d9f-42a9-ad41-2fc2d4aa6efa",
+      "name": "DELIV_USERNAME__FN_SET_AWAITING"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "bcda2a6a-0087-41a6-ab24-75a5a8a224dd",
+              "leftValue": "={{ $json.session?.last_inline_message_id }}",
+              "rightValue": "fake_",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {
+          "looseTypeValidation": true
+        }
+      },
+      "id": "4855edc0-c557-4e20-92b1-f5440e1f2614",
+      "name": "START__IF_HAS_LAST_INLINE26",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -448,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot8738651494:AAEEKr11vSTrb-5y602bhqsyOHWp1sN35x8/editMessageReplyMarkup",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  chat_id: $node[\"When Executed by Another Workflow\"].json.chat_id,\n  message_id: $json.session?.last_inline_message_id,\n  reply_markup: { inline_keyboard: [] }\n} }}",
+        "options": {}
+      },
+      "id": "70a6b5c1-5884-4d9b-a979-a816319a3d9f",
+      "name": "START__TG_EDIT_RM_LAST_INLINE29",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        -224,
+        80
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot8738651494:AAEEKr11vSTrb-5y602bhqsyOHWp1sN35x8/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n({\n  chat_id: Number($json.session.tg_user_id),\n  text: \"Укажите @username получателя (пример: @ivan_ivanov).\\n\\nБот не напишет ему напрямую — 8 марта мы пришлём вам PNG и кнопку открытия чата.\"\n})\n}}",
+        "options": {}
+      },
+      "id": "189b4c0a-ff23-4fb4-a6a4-b45bbdbb5075",
+      "name": "TG_PREPARE_DOC5",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        224,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "f828da95-1d82-4860-b324-e93786845174",
+      "name": "MERGE_CTX_USER6",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Берём вход как есть\nconst input = $json;\n\n// Гарантируем session\nconst session = { ...(input.session ?? {}) };\n\n// Ставим FSM ожидание username\nsession.awaiting = 'delivery_username';\n\n// Обычно полезно зафиксировать, что мы продолжаем тариф 199\n// Если не нужно — удаляй эти 2 строки\nsession.tariff_pending = session.tariff_pending ?? '199';\n\n// Служебное: обновим updated_at (если используешь)\nsession.updated_at = Date.now();\n\n// Сформируем стандарт для Redis SET\nconst tgUserId = String(session.tg_user_id ?? input.tg_user_id ?? '');\nif (!tgUserId) {\n  throw new Error('NO_TG_USER_ID_FOR_REDIS_SESSION');\n}\n\nconst redis_key = `razresheno:sess:${tgUserId}`;\nconst redis_value = JSON.stringify(session);\nconst redis_ttl = 86400;\n\nreturn [{\n  json: {\n    ...input,\n    session,\n    redis_key,\n    redis_value,\n    redis_ttl,\n  },\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        144
+      ],
+      "id": "9553582b-3233-4783-8682-3d71b63dc62c",
+      "name": "PAY199__FN_SET_LAST_INLINE_ID1"
+    },
+    {
+      "parameters": {
+        "operation": "set",
+        "key": "={{$json.redis_key}}",
+        "value": "={{$json.redis_value}}",
+        "expire": true,
+        "ttl": "={{$json.redis_ttl}}"
+      },
+      "id": "36e34f40-f27e-4ad6-9684-3ade448e45c9",
+      "name": "REDIS_SET_SESSION_TZ_PENDING_205",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        896,
+        144
+      ],
+      "credentials": {
+        "redis": {
+          "id": "L8CJmx035hDrVPs3",
+          "name": "Redis razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "bb81a6bd-b86e-47dd-bca3-c920bd8f15f2",
+      "name": "MERGE_SEAL_PICK12",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        448,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -1312,
+        224
+      ],
+      "id": "132cd01d-d57c-45e0-9de9-6a3a7bebca64",
+      "name": "When Executed by Another Workflow"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "PAY__REDIS_GET_SESSION2": {
+      "main": [
+        [
+          {
+            "node": "PAY__FN_PARSE_SESSION2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PAY__FN_PARSE_SESSION2": {
+      "main": [
+        [
+          {
+            "node": "DELIV_USERNAME__FN_SET_AWAITING",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DELIV_USERNAME__FN_SET_AWAITING": {
+      "main": [
+        [
+          {
+            "node": "START__IF_HAS_LAST_INLINE26",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "MERGE_SEAL_PICK12",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "START__IF_HAS_LAST_INLINE26": {
+      "main": [
+        [
+          {
+            "node": "START__TG_EDIT_RM_LAST_INLINE29",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "MERGE_CTX_USER6",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "TG_PREPARE_DOC5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "START__TG_EDIT_RM_LAST_INLINE29": {
+      "main": [
+        [
+          {
+            "node": "MERGE_CTX_USER6",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "TG_PREPARE_DOC5": {
+      "main": [
+        [
+          {
+            "node": "MERGE_SEAL_PICK12",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "MERGE_CTX_USER6": {
+      "main": [
+        [
+          {
+            "node": "TG_PREPARE_DOC5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PAY199__FN_SET_LAST_INLINE_ID1": {
+      "main": [
+        [
+          {
+            "node": "REDIS_SET_SESSION_TZ_PENDING_205",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MERGE_SEAL_PICK12": {
+      "main": [
+        [
+          {
+            "node": "PAY199__FN_SET_LAST_INLINE_ID1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "PAY__REDIS_GET_SESSION2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "b3eb9b19-cfb2-481c-836f-2dcc5e4596f7",
+  "meta": {
+    "instanceId": "784907556f0c89efbde9ba288f0c0441c5b09242030c81d05d67aac99d485958"
+  },
+  "id": "8GklqHAITA2QoxC9",
+  "tags": []
+}

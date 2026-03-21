@@ -1,0 +1,312 @@
+{
+  "name": "2_TZ_CHANGE",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "get",
+        "propertyName": "session",
+        "key": "=razresheno:sess:{{ $('When Executed by Another Workflow').item.json.tg_user_id }}",
+        "options": {
+          "dotNotation": true
+        }
+      },
+      "id": "b373d102-92c5-4362-96bd-517acb7eb408",
+      "name": "TZ_CHANGE__REDIS_GET_SESSION",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        -544,
+        -288
+      ],
+      "credentials": {
+        "redis": {
+          "id": "L8CJmx035hDrVPs3",
+          "name": "Redis razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "set",
+        "key": "=razresheno:sess:{{ $('When Executed by Another Workflow').item.json.tg_user_id }}",
+        "value": "={{ JSON.stringify($json.session) }}",
+        "expire": true,
+        "ttl": 86400
+      },
+      "id": "702e4815-11d7-4d9f-b1f3-2b3fc8743cc0",
+      "name": "TZ_CHANGE__REDIS_SET_SESSION",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        -96,
+        -288
+      ],
+      "credentials": {
+        "redis": {
+          "id": "L8CJmx035hDrVPs3",
+          "name": "Redis razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot8738651494:AAEEKr11vSTrb-5y602bhqsyOHWp1sN35x8/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  chat_id: $node[\"When Executed by Another Workflow\"].json.chat_id,\n  text: \"🏛 Бюро «Разрешено» \\nВыберите ваш часовой пояс (он будет сохранён и применён к будущим отправкам):\",\n  reply_markup: {\n    inline_keyboard: [\n      [{ text: \"MSK (UTC+3)\", callback_data: \"TZ:Europe/Moscow\" }],\n      [\n        { text: \"Екатеринбург (UTC+5)\", callback_data: \"TZ:Asia/Yekaterinburg\" },\n        { text: \"Омск (UTC+6)\", callback_data: \"TZ:Asia/Omsk\" }\n      ],\n      [\n        { text: \"Красноярск (UTC+7)\", callback_data: \"TZ:Asia/Krasnoyarsk\" },\n        { text: \"Иркутск (UTC+8)\", callback_data: \"TZ:Asia/Irkutsk\" }\n      ],\n      [\n        { text: \"Якутск (UTC+9)\", callback_data: \"TZ:Asia/Yakutsk\" },\n        { text: \"Владивосток (UTC+10)\", callback_data: \"TZ:Asia/Vladivostok\" }\n      ]\n    ]\n  }\n}) }}",
+        "options": {}
+      },
+      "id": "c18b295b-21c2-44be-b2d1-a1ca1b4106cd",
+      "name": "TZ_CHANGE__SEND_TZ_KEYBOARD",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        640,
+        -144
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw =\n  $json.session ??\n  $json.data ??\n  $json.redis?.session ??\n  $json.redis?.data ??\n  null;\n\nlet sess = {};\ntry { sess = raw ? JSON.parse(String(raw)) : {}; } catch (e) { sess = {}; }\nif (!sess || typeof sess !== \"object\") sess = {};\n\n// важные поля не теряем\nsess.active_request_id = sess.active_request_id ?? null;\nsess.current_variant_idx = sess.current_variant_idx ?? \"0\";\nsess.last_variant_idx = sess.last_variant_idx ?? \"0\";\nsess.recipient_name = sess.recipient_name ?? null;\nsess.initiator_timezone = sess.initiator_timezone ?? null;\n\n// маркер: после выбора TZ вернуться на тарифы\nsess.tz_return_to = \"seal_pick_tariffs\";\n\n// это ручная смена TZ, поэтому не должен включаться сценарий оплаты 199\nsess.tariff_pending = null;\n\n// переводим FSM в ожидание tz\nsess.awaiting = \"tz\";\n\nreturn [{ json: { ...$json, session: sess } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -320,
+        -288
+      ],
+      "id": "0e4f9304-cb61-44c7-be35-3efe6a10ed16",
+      "name": "FN_SET_TZ_RETURN_TARIFFS1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "bcda2a6a-0087-41a6-ab24-75a5a8a224dd",
+              "leftValue": "={{ $json.session.last_inline_message_id }}",
+              "rightValue": "fake_",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {
+          "looseTypeValidation": true
+        }
+      },
+      "id": "1e602f4b-d4dc-4a1e-9495-fe137b58c90b",
+      "name": "START__IF_HAS_LAST_INLINE23",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        192,
+        -144
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot8738651494:AAEEKr11vSTrb-5y602bhqsyOHWp1sN35x8/editMessageReplyMarkup",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  chat_id: $node[\"When Executed by Another Workflow\"].json.chat_id,\n  message_id: Number($json.session.last_inline_message_id),\n  reply_markup: { inline_keyboard: [] }\n} }}",
+        "options": {}
+      },
+      "id": "add80bda-29a0-4852-b5aa-900082097b28",
+      "name": "START__TG_EDIT_RM_LAST_INLINE24",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        416,
+        -208
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "039b68f7-2a6c-4597-9b03-2c7403a3daca",
+              "name": "tg_user_id",
+              "value": "={{ $('When Executed by Another Workflow').item.json.tg_user_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1184,
+        -208
+      ],
+      "id": "b32d91d7-e5ef-4504-9485-d504f3d75356",
+      "name": "Edit Fields14"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "eUEULrK9LXoOY54R",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/eUEULrK9LXoOY54R",
+          "cachedResultName": "2_save_session_final"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1376,
+        -208
+      ],
+      "id": "065d7ae9-5eb6-4a53-b982-99f5ea2a768a",
+      "name": "Call '2_save_session_final'12"
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -768,
+        -288
+      ],
+      "id": "a027ce5a-0bfb-4537-ba33-87801ac24daf",
+      "name": "When Executed by Another Workflow"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "TZ_CHANGE__REDIS_GET_SESSION": {
+      "main": [
+        [
+          {
+            "node": "FN_SET_TZ_RETURN_TARIFFS1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TZ_CHANGE__REDIS_SET_SESSION": {
+      "main": [
+        [
+          {
+            "node": "START__IF_HAS_LAST_INLINE23",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TZ_CHANGE__SEND_TZ_KEYBOARD": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields14",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FN_SET_TZ_RETURN_TARIFFS1": {
+      "main": [
+        [
+          {
+            "node": "TZ_CHANGE__REDIS_SET_SESSION",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "START__IF_HAS_LAST_INLINE23": {
+      "main": [
+        [
+          {
+            "node": "START__TG_EDIT_RM_LAST_INLINE24",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "TZ_CHANGE__SEND_TZ_KEYBOARD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "START__TG_EDIT_RM_LAST_INLINE24": {
+      "main": [
+        [
+          {
+            "node": "TZ_CHANGE__SEND_TZ_KEYBOARD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields14": {
+      "main": [
+        [
+          {
+            "node": "Call '2_save_session_final'12",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "TZ_CHANGE__REDIS_GET_SESSION",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "3fde262c-c237-4892-947f-38071f99f1a0",
+  "meta": {
+    "instanceId": "784907556f0c89efbde9ba288f0c0441c5b09242030c81d05d67aac99d485958"
+  },
+  "id": "gqShLVJ9Q7VcgBQz",
+  "tags": []
+}

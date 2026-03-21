@@ -1,0 +1,16 @@
+{
+  "mode": "preview",
+  "recipient_name": "Анна",
+  "initiator_name": "Саша",
+  "doc_no": "0803-777",
+  "templates_dir": "/mnt/razresheno/templates",
+  "bg": "bg1.png",
+  "intro": "Настоящим разрешается:",
+  "points": ["Отдыхать без вины", "Принимать комплименты", "Просить поддержку"],
+  "qr_url": "https://t.me/razresheno_buro_bot",
+  "layout": {
+    "seal": {"x": 820, "y": 1320, "rot": -6, "opacity": 0.82, "color": "season_pink"},
+    "stamp": {"x": 320, "y": 980, "rot": 8, "opacity": 0.9}
+  },
+  "output_path": "/mnt/razresheno/renders/previews/test.png"
+}

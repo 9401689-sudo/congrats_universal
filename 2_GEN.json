@@ -1,0 +1,1200 @@
+{
+  "name": "2_GEN",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "// FN_GEN_NEXT_IDX\n\nconst session = ($json.session && typeof $json.session === \"object\") ? $json.session : {};\n\nconst last = Number(session.last_variant_idx ?? 0);\nconst next = last + 1;\n\nsession.current_variant_idx = String(next);\nsession.last_variant_idx = String(next);\n\n// ВАЖНО: отдаём next отдельно, чтобы удобно использовать в ключах Redis\nreturn [{\n  json: {\n    ...$json,\n    session,\n    next_variant_idx: next,\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -448,
+        224
+      ],
+      "id": "c79ee1cb-691f-4c80-9d3a-f826c3aed06a",
+      "name": "FN_GEN_NEXT_IDX"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "propertyName": "session",
+        "key": "=razresheno:sess:{{ $('When Executed by Another Workflow').item.json.tg_user_id }}",
+        "options": {
+          "dotNotation": true
+        }
+      },
+      "id": "590cfc88-4f56-41eb-8c90-29faa30881b6",
+      "name": "REDIS_GET_SESSION_CLB_GEN",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        -896,
+        224
+      ],
+      "credentials": {
+        "redis": {
+          "id": "L8CJmx035hDrVPs3",
+          "name": "Redis razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "bcda2a6a-0087-41a6-ab24-75a5a8a224dd",
+              "leftValue": "={{$json.is_over_limit}}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "b1986aef-57a6-428c-a2ab-97ac9d394afc",
+      "name": "IF_IS_START2",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -224,
+        224
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot8738651494:AAEEKr11vSTrb-5y602bhqsyOHWp1sN35x8/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  chat_id: $node[\"When Executed by Another Workflow\"].json.chat_id,\n  text: \"🏛 Бюро «Разрешено» \\n\\nПодготовка вариантов в рамках текущего обращения завершена.\\n\\nУкажите вариант, подлежащий заверению.\",\n  reply_markup: {\n    inline_keyboard: [\n      [{ text: \"Вариант 1\", callback_data: \"SEAL_PICK:1\" }],\n      [{ text: \"Вариант 2\", callback_data: \"SEAL_PICK:2\" }],\n      [{ text: \"Вариант 3\", callback_data: \"SEAL_PICK:3\" }]\n    ]\n  }\n}) }}",
+        "options": {}
+      },
+      "id": "a01eb617-2667-489e-b433-726bccbe7c9d",
+      "name": "TG_PREPARE_DOC1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        448,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select id, recipient_name\nfrom razreshenobot.requests\nwhere id = $1\nlimit 1;",
+        "options": {
+          "queryReplacement": "={{ (() => {\n  const v =\n    $json.active_request_id ??\n    $json.session?.active_request_id ??\n    $node[\"FN_PARSE_SESSION\"]?.json?.active_request_id ??\n    null;\n\n  const n = parseInt(String(v ?? ''), 10);\n  return Number.isFinite(n) ? n : 0;  // <-- 0 безопаснее чем NaN\n})() }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        0,
+        432
+      ],
+      "id": "bcd2c807-9144-470f-bc1c-16cc89583db0",
+      "name": "PG_GET_REQUEST",
+      "credentials": {
+        "postgres": {
+          "id": "e36q5Gqlsldmqa0I",
+          "name": "Postgres razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ====== CONFIG ======\nconst ENGINE_VERSION = \"engine-1\";\nconst ASSETS_VERSION = \"assets-2026-02\";\n\nconst TEMPLATES_DIR = \"/mnt/razresheno/templates\";\nconst OUT_CLOUD_DIR = \"/mnt/razresheno/renders/previews\";      // куда копируем в Nextcloud\nconst OUT_LOCAL_DIR = \"/opt/razresheno/renders/previews\";      // куда реально рендерим\nconst TMP_DIR = \"/opt/razresheno/renders/tmp\";\n\nconst POINTS_COUNT = 8;\n\n// 1600x2400: нижняя четверть y>=1800, поля >=100\n// ВАЖНО: bg_files убрали — фон выбираем из реальных файлов в папке bg*.png\nconst TEMPLATE_REGISTRY = {\n  t01: {\n    name: \"Classic A\",\n    seal_presets: [\n      { x: 920, y: 1820, rotation: -8,  scale: 0.82, opacity: 0.78 },\n      { x: 980, y: 1880, rotation: -12, scale: 0.82, opacity: 0.80 },\n      { x: 1040,y: 1860, rotation: -6,  scale: 0.82, opacity: 0.76 },\n    ],\n    stamp_presets: [\n      { x: 220, y: 1900, rotation: 10, scale: 0.90, opacity: 0.90 },\n      { x: 260, y: 1980, rotation: 8,  scale: 0.90, opacity: 0.88 },\n      { x: 320, y: 1940, rotation: 14, scale: 0.90, opacity: 0.92 },\n    ],\n  },\n  t02: {\n    name: \"Minimal B\",\n    seal_presets: [\n      { x: 980, y: 1840, rotation: -10, scale: 0.82, opacity: 0.78 },\n      { x: 1040,y: 1900, rotation: -15, scale: 0.82, opacity: 0.80 },\n    ],\n    stamp_presets: [\n      { x: 240, y: 1920, rotation: 10, scale: 0.90, opacity: 0.90 },\n      { x: 300, y: 2000, rotation: 6,  scale: 0.90, opacity: 0.88 },\n    ],\n  },\n  t03: {\n    name: \"Bold C\",\n    seal_presets: [\n      { x: 1000,y: 1860, rotation: -5, scale: 0.82, opacity: 0.76 },\n      { x: 920, y: 1820, rotation: -9, scale: 0.82, opacity: 0.80 },\n    ],\n    stamp_presets: [\n      { x: 260, y: 1960, rotation: 16, scale: 0.90, opacity: 0.92 },\n      { x: 320, y: 2020, rotation: 12, scale: 0.90, opacity: 0.90 },\n    ],\n  },\n};\n\n// ====== HELPERS ======\nfunction simpleHash(str) {\n  let h = 0;\n  for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0;\n  return h;\n}\n\nfunction pickDeterministic(arr, seedStr) {\n  if (!arr || !arr.length) throw new Error(\"pickDeterministic: empty array\");\n  const h = simpleHash(seedStr);\n  return arr[h % arr.length];\n}\n\nfunction pickTemplateId(requestId, idx) {\n  const keys = Object.keys(TEMPLATE_REGISTRY);\n  return pickDeterministic(keys, `${requestId}:tpl:${idx}`);\n}\n\nfunction shuffleDeterministic(arr, seedStr) {\n  const a = [...arr];\n  let h = simpleHash(seedStr);\n  for (let i = a.length - 1; i > 0; i--) {\n    const j = h % (i + 1);\n    [a[i], a[j]] = [a[j], a[i]];\n    h = (h * 1103515245 + 12345) >>> 0;\n  }\n  return a;\n}\n\nfunction sampleDeterministic(arr, seedStr, n) {\n  if (!arr || !arr.length) return [];\n  const shuffled = shuffleDeterministic(arr, seedStr);\n  return shuffled.slice(0, Math.min(n, shuffled.length));\n}\n\nfunction uniqueNonEmpty(arr) {\n  const seen = new Set();\n  const out = [];\n  for (const item of (arr || [])) {\n    const s = String(item ?? \"\").trim();\n    if (!s) continue;\n    if (seen.has(s)) continue;\n    seen.add(s);\n    out.push(s);\n  }\n  return out;\n}\n\nfunction buildPointsPool(phrasesDb, category) {\n  const universal = Array.isArray(phrasesDb?.points?.universal) ? phrasesDb.points.universal : [];\n  const categoryPool = (phrasesDb?.points && Array.isArray(phrasesDb.points[category]))\n    ? phrasesDb.points[category]\n    : [];\n\n  // Если категория universal — не дублируем universal дважды\n  if (category === \"universal\") {\n    return uniqueNonEmpty(universal);\n  }\n\n  // Сначала категорийные фразы, потом добивка universal\n  return uniqueNonEmpty([...categoryPool, ...universal]);\n}\n\n// ====== INPUTS ======\nconst session = $node[\"FN_PARSE_SESSION\"]?.json?.session ?? $json.session ?? {};\nconst reqNode = $node[\"PG_GET_REQUEST\"]?.json ?? {};\nconst req = reqNode.request ?? reqNode;\nconst phrasesDb = $node[\"FN_PARSE_PHRASES\"]?.json?.phrasesDb ?? $json.phrasesDb ?? {};\n\n// bgFiles приходят из новых нод\nconst bgFiles = $node[\"FN_PARSE_BGS\"]?.json?.bgFiles ?? [];\nif (!bgFiles.length) throw new Error(\"bgFiles empty (FN_PARSE_BGS)\");\n\nconst requestId = String(req.id ?? session.active_request_id ?? \"\");\nif (!requestId) throw new Error(\"No requestId\");\n\nconst tgUserId = String(session.tg_user_id ?? \"\");\nif (!tgUserId) throw new Error(\"No tg_user_id in session\");\n\nconst recipient = String(req.recipient_name ?? session.recipient_name ?? \"Получатель\");\n\nconst initiatorName = String(\n  session.tg_first_name ??\n  session.first_name ??\n  \"Инициатор\"\n).trim();\n\nconst callback = String(\n  $json.callback_data ??\n  $json.data ??\n  $json.callback?.data ??\n  $json.body?.callback_query?.data ??\n  \"\"\n);\n\n// idx: GEN_FIRST => 1, GEN_NEXT => last+1 (до 3)\nlet idx;\nif (callback === \"GEN_FIRST\") {\n  idx = 1;\n} else {\n  const last = Number(session.last_variant_idx ?? 0);\n  idx = Math.min(last + 1, 3);\n  if (idx < 1) idx = 1;\n}\n\n// Детерминированный seed на вариант: один requestId + idx = один вариант\nconst seed = `${requestId}:v:${idx}`;\n\n// ====== TEMPLATE + LAYOUT ======\nconst template_id = pickTemplateId(requestId, idx);\nconst tpl = TEMPLATE_REGISTRY[template_id];\n\nconst sealPreset = pickDeterministic(tpl.seal_presets, `${seed}:seal`);\nconst stampPreset = pickDeterministic(tpl.stamp_presets, `${seed}:stamp`);\n\n// ФОН: выбираем из ВСЕХ bg*.png, детерминированно для конкретного варианта\nconst bgFile = pickDeterministic(bgFiles, `${seed}:bg`);\n\n// ====== CONTENT FROM phrases.json ======\nconst cat = String(session.category ?? \"universal\");\n\nconst intros = Array.isArray(phrasesDb.intros) && phrasesDb.intros.length\n  ? phrasesDb.intros\n  : [\"Настоящим разрешается:\"];\n\n// интро тоже детерминировано на вариант\nconst intro = pickDeterministic(intros, `${seed}:intro`);\n\n// пул пунктов:\n// 1) берём категорию\n// 2) если не хватает — добиваем universal\n// 3) убираем дубли\nconst pointsPool = buildPointsPool(phrasesDb, cat);\n\nif (!pointsPool.length) {\n  throw new Error(`points pool empty for category=${cat}`);\n}\n\n// пункты: ДОЛЖНО БЫТЬ 8, как в тесте\nconst points = sampleDeterministic(pointsPool, `${seed}:points`, POINTS_COUNT);\n\n// ====== VARIANT ======\nconst variant = {\n  idx,\n  recipient_name: recipient,\n  initiator_name: initiatorName,\n  template_id,\n  bg: bgFile,\n  layout: {\n    seal: {\n      x: sealPreset.x,\n      y: sealPreset.y,\n      rot: sealPreset.rotation,\n      scale: sealPreset.scale,\n      opacity: sealPreset.opacity,\n      color: \"season_pink\"\n    },\n    stamp: {\n      x: stampPreset.x,\n      y: stampPreset.y,\n      rot: stampPreset.rotation,\n      scale: stampPreset.scale,\n      opacity: stampPreset.opacity\n    }\n  },\n  content: { intro, points },\n  meta: {\n    engine_version: ENGINE_VERSION,\n    assets_version: ASSETS_VERSION,\n    created_at: Math.floor(Date.now() / 1000),\n  },\n};\n\nconst variant_json = JSON.stringify(variant);\nconst docNo = `0803-${(simpleHash(seed) % 900) + 100}`;\n\n// ====== PATHS ======\nconst inPath = `${TMP_DIR}/req${requestId}_v${idx}.json`;\nconst outPathLocal = `${OUT_LOCAL_DIR}/req${requestId}_v${idx}.png`;\nconst outPathCloud = `${OUT_CLOUD_DIR}/req${requestId}_v${idx}.png`;\n\n// ====== RENDER JSON ======\nconst renderJson = {\n  mode: \"preview\",\n  templates_dir: TEMPLATES_DIR,\n  bg: bgFile,\n\n  doc_no: docNo,\n  recipient_name: recipient,\n  initiator_name: initiatorName,\n  \n  header_small: \"Специальный выпуск к 8 марта\\nРегламентирующая инстанция «РАЗРЕШЕНО»\",\n  title: \"РАЗРЕШЕНО\",\n  subtitle: `ОФИЦИАЛЬНЫЙ ДОКУМЕНТ № ${docNo}`,\n  intro,\n  points,\n\n  footer_lines: [\"Вступает в силу немедленно.\", \"Обжалованию не подлежит.\"],\n  watermark_lines: [\"Предварительная версия.\", \"Не заверено.\"],\n  source_line: \"Источник оформления: razresheno\",\n\n  qr_url: \"https://t.me/razresheno_buro_bot?start=docqr\",\n  text_block_y: 760,\n\n  layout: variant.layout,\n  output_path: outPathLocal\n};\n\nreturn [{\n  json: {\n    ...$json,\n\n    request_id: requestId,\n    tg_user_id: tgUserId,\n\n    idx,\n    variant,\n    variant_json,\n    variantKey: `razresheno:req:${requestId}:v:${idx}`,\n\n    inPath,\n    outPathLocal,\n    outPathCloud,\n    renderJson,\n\n    session_patch: {\n      current_variant_idx: String(idx),\n      last_variant_idx: String(idx),\n      awaiting: \"none\"\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2016,
+        288
+      ],
+      "id": "394ac526-d4eb-4483-bcac-f3173803e45b",
+      "name": "FN_BUILD_VARIANT"
+    },
+    {
+      "parameters": {
+        "operation": "set",
+        "key": "={{ `razresheno:req:${$json.active_request_id ?? $json.session?.active_request_id}:v:${$json.idx ?? $json.variant?.idx ?? $json.session?.last_variant_idx ?? 1}` }}",
+        "value": "={{ JSON.stringify($json.variant) }}",
+        "keyType": "string",
+        "expire": true,
+        "ttl": 86400
+      },
+      "id": "b5ed9eed-7364-43fc-8635-6d30be819bd1",
+      "name": "REDIS_SET_VARIANT",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        4480,
+        288
+      ],
+      "credentials": {
+        "redis": {
+          "id": "L8CJmx035hDrVPs3",
+          "name": "Redis razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "c642b10e-37d2-4b47-a3fa-e767f20b84eb",
+      "name": "MERGE_CTX_USER4",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        224,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Берём текущую session\nconst session = $node[\"FN_PARSE_SESSION\"]?.json?.session ?? $json.session ?? {};\nconst tgUserId = String(session.tg_user_id ?? $json.tg_user_id ?? \"\");\nif (!tgUserId) throw new Error(\"No tg_user_id\");\n\n// idx после генерации: сначала $json.idx, потом variant.idx\nconst idx =\n  Number($json.idx ?? $json.variant?.idx ?? 0);\n\nif (!idx) throw new Error(\"No idx after generation\");\n\n// Патчим session\nconst patched = {\n  ...session,\n  current_variant_idx: String(idx),\n  last_variant_idx: String(idx),\n  awaiting: \"none\",\n};\n\n// (опционально) оставим active_request_id как есть, не трогаем\n// patched.active_request_id = session.active_request_id;\n\nreturn [{\n  json: {\n    tg_user_id: tgUserId,\n    session: patched\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4704,
+        288
+      ],
+      "id": "1d03d8c6-2cb8-439a-8cf6-824388addeb7",
+      "name": "FN_BUILD_SESSION_AFTER_GEN"
+    },
+    {
+      "parameters": {
+        "operation": "set",
+        "key": "=razresheno:sess:{{ $('When Executed by Another Workflow').item.json.tg_user_id }}",
+        "value": "={{ JSON.stringify($json.session) }}",
+        "expire": true,
+        "ttl": 21600
+      },
+      "id": "4f507036-7fbd-4f23-9d11-a35a6510ae0d",
+      "name": "REDIS_SET_SESSION2",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        4928,
+        288
+      ],
+      "credentials": {
+        "redis": {
+          "id": "L8CJmx035hDrVPs3",
+          "name": "Redis razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "bcda2a6a-0087-41a6-ab24-75a5a8a224dd",
+              "leftValue": "={{ $node[\"FN_PARSE_SESSION\"].json.session?.last_inline_message_id }}",
+              "rightValue": "fake_",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {
+          "looseTypeValidation": true
+        }
+      },
+      "id": "8a393c8e-84fd-4ff8-a759-aee40140a742",
+      "name": "START__IF_HAS_LAST_INLINE4",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot8738651494:AAEEKr11vSTrb-5y602bhqsyOHWp1sN35x8/editMessageReplyMarkup",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  chat_id: $node[\"When Executed by Another Workflow\"].json.chat_id,\n  message_id: $node[\"When Executed by Another Workflow\"].json.session?.last_inline_message_id,\n  reply_markup: { inline_keyboard: [] }\n} }}",
+        "options": {}
+      },
+      "id": "19880844-2551-4d7d-ba68-397d51a38a25",
+      "name": "START__TG_EDIT_RM_LAST_INLINE5",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        224,
+        0
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "bcda2a6a-0087-41a6-ab24-75a5a8a224dd",
+              "leftValue": "={{ $node[\"FN_PARSE_SESSION\"].json.session?.last_inline_message_id }}",
+              "rightValue": "fake_",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {
+          "looseTypeValidation": true
+        }
+      },
+      "id": "56e882fb-afe9-4a46-b646-09f70a71a262",
+      "name": "START__IF_HAS_LAST_INLINE5",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        5152,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot8738651494:AAEEKr11vSTrb-5y602bhqsyOHWp1sN35x8/editMessageReplyMarkup",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  chat_id: $node[\"When Executed by Another Workflow\"].json.chat_id,\n  message_id: $node[\"When Executed by Another Workflow\"].json.session?.last_inline_message_id,\n  reply_markup: { inline_keyboard: [] }\n} }}",
+        "options": {}
+      },
+      "id": "27535199-f536-4c86-be8b-9dd124f21cf7",
+      "name": "START__TG_EDIT_RM_LAST_INLINE6",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        5376,
+        288
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// GEN__FN_PARSE_SESSION\n\nconst raw = $json.session ?? $json.redis?.session ?? $json.redis?.data ?? $json.data ?? null;\n\nlet sess = {};\ntry {\n  let parsed = raw;\n  if (typeof parsed === \"string\") parsed = JSON.parse(parsed);\n  if (typeof parsed === \"string\") parsed = JSON.parse(parsed); // на случай двойной сериализации\n  if (parsed && typeof parsed === \"object\" && !Array.isArray(parsed)) sess = parsed;\n} catch (e) {\n  sess = {};\n}\n\nsess.active_request_id = sess.active_request_id ?? null;\nsess.awaiting = sess.awaiting ?? \"none\";\nsess.current_variant_idx = String(sess.current_variant_idx ?? \"0\");\nsess.last_variant_idx = String(sess.last_variant_idx ?? \"0\");\nsess.recipient_name = sess.recipient_name ?? null;\nsess.last_inline_message_id = sess.last_inline_message_id ?? null;\n\nreturn [{ json: { ...$json, session: sess } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -672,
+        224
+      ],
+      "id": "fe4cbeba-cd5d-43d5-815d-27a5c478fe6c",
+      "name": "FN_PARSE_SESSION"
+    },
+    {
+      "parameters": {
+        "jsCode": "// достаём requestId из разных мест\nconst rid =\n  $json.active_request_id ??\n  $json.session?.active_request_id ??\n  $json.request_id ??\n  null;\n\nif (!rid) throw new Error(\"GEN: active_request_id is missing\");\n\n// возвращаем КОРРЕКТНЫЙ item-формат\nreturn [{\n  json: {\n    ...$json,\n    active_request_id: String(rid),\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4256,
+        288
+      ],
+      "id": "4c571bce-cc47-4826-a0c5-3f1899d13da7",
+      "name": "GEN__FN_ASSERT_ACTIVE_REQUEST_ID"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot8738651494:AAEEKr11vSTrb-5y602bhqsyOHWp1sN35x8/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n(() => {\n  const idx =\n    Number($json.idx ?? $json.variant?.idx ?? $json.session?.last_variant_idx ?? $json.last_variant_idx ?? 1) || 1;\n\n  const header = `🏛 Бюро «Разрешено» \\n\\nПодготовлен вариант №${idx}.\\n`;\n\n  const remaining = 3 - idx;\n  let availability = \"\";\n  if (remaining === 2) {\n    availability = \"Осталось 2 варианта в рамках текущего обращения.\\n\\n\";\n  } else if (remaining === 1) {\n    availability = \"Остался 1 вариант в рамках текущего обращения.\\n\\n\";\n  } else {\n    availability = \"Подготовка вариантов в рамках текущего обращения завершена.\\n\\n\";\n  }\n\n  return {\n    chat_id: $node[\"When Executed by Another Workflow\"].json.chat_id,\n    text:\n      header +\n      availability +\n      \"Вступает в силу немедленно.\\nОбжалованию не подлежит.\",\n    reply_markup: idx < 3\n      ? {\n          inline_keyboard: [\n            [{ text: \"Подготовить другой вариант\", callback_data: \"GEN_NEXT\" }],\n            [{ text: \"Перейти к заверению\", callback_data: \"GO_SEAL\" }]\n          ]\n        }\n      : {\n          inline_keyboard: [\n               [{ text: \"Вариант 1\", callback_data: \"SEAL_PICK:1\" }],\n              [{ text: \"Вариант 2\", callback_data: \"SEAL_PICK:2\" }],\n              [{ text: \"Вариант 3\", callback_data: \"SEAL_PICK:3\" }]\n          ]\n        }\n  };\n})()\n}}",
+        "options": {}
+      },
+      "id": "93939ae7-981c-4c8c-bde6-d428941d16a8",
+      "name": "TG_PREPARE_DOC4",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        5824,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "0dc13333-f700-4b23-bad6-ea3f0bbb480a",
+      "name": "MERGE_CTX_USER5",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        5600,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const out = $node[\"CMD_READ_PHRASES\"].json.stdout || \"\";\nconst phrasesDb = JSON.parse(out);\nreturn [{ json: { phrasesDb } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        288
+      ],
+      "id": "67583d7c-04ed-450e-a69d-364ae53d96a6",
+      "name": "FN_PARSE_PHRASES"
+    },
+    {
+      "parameters": {
+        "command": "/opt/razresheno/sync_phrases.sh"
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        448,
+        432
+      ],
+      "id": "436db81c-ca86-493c-bff2-771788bc2b5a",
+      "name": "CMD_SYNC_PHRASES",
+      "credentials": {
+        "sshPassword": {
+          "id": "gEHoJf4PNQBaO9SP",
+          "name": "SSH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "cat /opt/razresheno/cache/phrases.json"
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        672,
+        432
+      ],
+      "id": "25960a95-2632-49bd-9531-2d031c33c557",
+      "name": "CMD_READ_PHRASES",
+      "credentials": {
+        "sshPassword": {
+          "id": "gEHoJf4PNQBaO9SP",
+          "name": "SSH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "=set -e\n\necho \"IN={{$json.inPath}}\"\necho \"OUT={{$json.outPathLocal}}\"\n\nmkdir -p \"$(dirname \"{{$json.outPathLocal}}\")\"\n\n/opt/razresheno/venv/bin/python /opt/razresheno/render_doc.py \"{{$json.inPath}}\"\n\ntest -f \"{{$json.outPathLocal}}\" || (echo \"NO_PREVIEW_FILE {{$json.outPathLocal}}\" >&2; exit 1)\nls -la \"{{$json.outPathLocal}}\""
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        2912,
+        432
+      ],
+      "id": "ff5b5194-494c-4d73-a036-829e59c3aaa8",
+      "name": "CMD_RENDER_PREVIEW",
+      "credentials": {
+        "sshPassword": {
+          "id": "gEHoJf4PNQBaO9SP",
+          "name": "SSH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { ...$json, renderJsonText: JSON.stringify($json.renderJson) } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2240,
+        288
+      ],
+      "id": "aababf27-0970-438b-b5c0-9c2cd773df7a",
+      "name": "FN_STRINGIFY_RENDERJSON"
+    },
+    {
+      "parameters": {
+        "command": "=set -e\nmkdir -p /opt/razresheno/renders/tmp\nmkdir -p /opt/razresheno/rengers/previews\nprintf '%s' '{{$json.renderJsonText}}' > \"{{$json.inPath}}\""
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        2464,
+        432
+      ],
+      "id": "34f514a6-9c69-412a-85de-e6ba982ee148",
+      "name": "CMD_WRITE_RENDERJSON",
+      "credentials": {
+        "sshPassword": {
+          "id": "gEHoJf4PNQBaO9SP",
+          "name": "SSH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "=set -e\nmkdir -p \"$(dirname \"{{$json.outPathCloud}}\")\"\n\nfor i in 1 2 3 4 5; do\n  if cp \"{{$json.outPathLocal}}\" \"{{$json.outPathCloud}}\" 2>/dev/null; then\n    ls -la \"{{$json.outPathCloud}}\"\n    exit 0\n  fi\n  sleep $((i*i))\ndone\n\necho \"FAILED_COPY_TO_NEXTCLOUD\" >&2\nexit 1"
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        3360,
+        432
+      ],
+      "id": "714cde6a-1930-430b-a9a4-7e64f3f2d2c5",
+      "name": "CMD_COPY_TO_NEXTCLOUD",
+      "credentials": {
+        "sshPassword": {
+          "id": "gEHoJf4PNQBaO9SP",
+          "name": "SSH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "9fc20d5e-eadd-4d89-a571-85405b5b8b93",
+      "name": "MERGE_CTX_USER11",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        2688,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "db413c6e-a32e-4bfa-8b44-c7f53c4925b0",
+      "name": "MERGE_CTX_USER12",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        3136,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "930692ab-90a8-4094-8d09-3836ab9d4828",
+      "name": "MERGE_CTX_USER13",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        3584,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "command": "=set -e\n\nFILE=\"{{$json.outPathLocal}}\"\nCHAT=\"{{$json.tg_user_id}}\"\n\ntest -f \"$FILE\" || (echo \"NO_FILE $FILE\" >&2; exit 1)\n\ncurl -sS -X POST \"https://api.telegram.org/bot8738651494:AAEEKr11vSTrb-5y602bhqsyOHWp1sN35x8/sendDocument\" \\\n  -F \"chat_id=$CHAT\" \\\n  -F \"document=@$FILE\" \\\n  -F \"caption=Вариант № {{$json.idx}}\" \\\n  | tee /tmp/tg_send_last.json"
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        3808,
+        432
+      ],
+      "id": "51768aea-c951-4a6c-88d5-565521abcd20",
+      "name": "CMD_SEND_TELEGRAM_DOCUMENT",
+      "credentials": {
+        "sshPassword": {
+          "id": "gEHoJf4PNQBaO9SP",
+          "name": "SSH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "76977abb-be99-4a5d-a79f-3e74c2e3de57",
+      "name": "MERGE_CTX_USER14",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        4032,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "f9db0d03-7018-42dc-b5f5-b2b1955c2e14",
+      "name": "MERGE_CTX_USER15",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        1792,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "command": "=set -e\n\ndir=\"/mnt/razresheno/templates/backgrounds\"\n\nif ls \"$dir\"/bg*.png >/dev/null 2>&1; then\n  for f in \"$dir\"/bg*.png; do\n    basename \"$f\"\n  done\nelse\n  echo \"\"\nfi"
+      },
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        1344,
+        432
+      ],
+      "id": "75b8922a-187b-4f91-915c-e66543049635",
+      "name": "CMD_LIST_BGS",
+      "credentials": {
+        "sshPassword": {
+          "id": "gEHoJf4PNQBaO9SP",
+          "name": "SSH"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const stdout = $node[\"CMD_LIST_BGS\"].json.stdout || \"\";\nconst bgFiles = stdout\n  .split(\"\\n\")\n  .map(s => s.trim())\n  .filter(Boolean)\n  .filter(name => /^bg.+\\.png$/i.test(name)); // на всякий\n\nif (!bgFiles.length) {\n  throw new Error(\"No bg*.png found in /mnt/razresheno/templates/backgrounds\");\n}\n\nreturn [{ json: { bgFiles } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        432
+      ],
+      "id": "751f2b15-6853-44ec-90d8-fd6ec30090a7",
+      "name": "FN_PARSE_BGS"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "id": "bb443857-8983-4ac8-9cef-a111b363bf4b",
+      "name": "MERGE_CTX_USER16",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        896,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -1088,
+        224
+      ],
+      "id": "864e8652-8e62-439d-8173-2a087d85f4e0",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "eUEULrK9LXoOY54R",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/eUEULrK9LXoOY54R",
+          "cachedResultName": "2_save_session_final"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        6080,
+        368
+      ],
+      "id": "96aa3a5d-4aba-41d6-b7ac-36576704b438",
+      "name": "Call '2_save_session_final'"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "eUEULrK9LXoOY54R",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/eUEULrK9LXoOY54R",
+          "cachedResultName": "2_save_session_final"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        864,
+        -16
+      ],
+      "id": "aa1fae78-3eff-479b-929d-b0ca64c7c0e2",
+      "name": "Call '2_save_session_final'1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "96e778c9-dcdc-41c2-88d8-e86ca6e0ad6c",
+              "name": "session",
+              "value": "={{ $('START__IF_HAS_LAST_INLINE').item.json.session }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        688,
+        -16
+      ],
+      "id": "22fe6371-8338-45c1-b480-fe5b5b5383c4",
+      "name": "Edit Fields1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "FN_GEN_NEXT_IDX": {
+      "main": [
+        [
+          {
+            "node": "IF_IS_START2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "REDIS_GET_SESSION_CLB_GEN": {
+      "main": [
+        [
+          {
+            "node": "FN_PARSE_SESSION",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF_IS_START2": {
+      "main": [
+        [
+          {
+            "node": "START__IF_HAS_LAST_INLINE4",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "PG_GET_REQUEST",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "MERGE_CTX_USER4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PG_GET_REQUEST": {
+      "main": [
+        [
+          {
+            "node": "MERGE_CTX_USER4",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "FN_BUILD_VARIANT": {
+      "main": [
+        [
+          {
+            "node": "FN_STRINGIFY_RENDERJSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "REDIS_SET_VARIANT": {
+      "main": [
+        [
+          {
+            "node": "FN_BUILD_SESSION_AFTER_GEN",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MERGE_CTX_USER4": {
+      "main": [
+        [
+          {
+            "node": "CMD_SYNC_PHRASES",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "MERGE_CTX_USER16",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FN_BUILD_SESSION_AFTER_GEN": {
+      "main": [
+        [
+          {
+            "node": "REDIS_SET_SESSION2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "REDIS_SET_SESSION2": {
+      "main": [
+        [
+          {
+            "node": "START__IF_HAS_LAST_INLINE5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "START__IF_HAS_LAST_INLINE4": {
+      "main": [
+        [
+          {
+            "node": "START__TG_EDIT_RM_LAST_INLINE5",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "TG_PREPARE_DOC1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "START__TG_EDIT_RM_LAST_INLINE5": {
+      "main": [
+        [
+          {
+            "node": "TG_PREPARE_DOC1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "START__IF_HAS_LAST_INLINE5": {
+      "main": [
+        [
+          {
+            "node": "START__TG_EDIT_RM_LAST_INLINE6",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "MERGE_CTX_USER5",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "TG_PREPARE_DOC4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "START__TG_EDIT_RM_LAST_INLINE6": {
+      "main": [
+        [
+          {
+            "node": "MERGE_CTX_USER5",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "FN_PARSE_SESSION": {
+      "main": [
+        [
+          {
+            "node": "FN_GEN_NEXT_IDX",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GEN__FN_ASSERT_ACTIVE_REQUEST_ID": {
+      "main": [
+        [
+          {
+            "node": "REDIS_SET_VARIANT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MERGE_CTX_USER5": {
+      "main": [
+        [
+          {
+            "node": "TG_PREPARE_DOC4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FN_PARSE_PHRASES": {
+      "main": [
+        [
+          {
+            "node": "CMD_LIST_BGS",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "MERGE_CTX_USER15",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CMD_SYNC_PHRASES": {
+      "main": [
+        [
+          {
+            "node": "CMD_READ_PHRASES",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CMD_READ_PHRASES": {
+      "main": [
+        [
+          {
+            "node": "MERGE_CTX_USER16",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "CMD_RENDER_PREVIEW": {
+      "main": [
+        [
+          {
+            "node": "MERGE_CTX_USER12",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "FN_STRINGIFY_RENDERJSON": {
+      "main": [
+        [
+          {
+            "node": "CMD_WRITE_RENDERJSON",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "MERGE_CTX_USER11",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CMD_WRITE_RENDERJSON": {
+      "main": [
+        [
+          {
+            "node": "MERGE_CTX_USER11",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "CMD_COPY_TO_NEXTCLOUD": {
+      "main": [
+        [
+          {
+            "node": "MERGE_CTX_USER13",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "MERGE_CTX_USER11": {
+      "main": [
+        [
+          {
+            "node": "CMD_RENDER_PREVIEW",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "MERGE_CTX_USER12",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MERGE_CTX_USER12": {
+      "main": [
+        [
+          {
+            "node": "CMD_COPY_TO_NEXTCLOUD",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "MERGE_CTX_USER13",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MERGE_CTX_USER13": {
+      "main": [
+        [
+          {
+            "node": "CMD_SEND_TELEGRAM_DOCUMENT",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "MERGE_CTX_USER14",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CMD_SEND_TELEGRAM_DOCUMENT": {
+      "main": [
+        [
+          {
+            "node": "MERGE_CTX_USER14",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "MERGE_CTX_USER14": {
+      "main": [
+        [
+          {
+            "node": "GEN__FN_ASSERT_ACTIVE_REQUEST_ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MERGE_CTX_USER15": {
+      "main": [
+        [
+          {
+            "node": "FN_BUILD_VARIANT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CMD_LIST_BGS": {
+      "main": [
+        [
+          {
+            "node": "FN_PARSE_BGS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FN_PARSE_BGS": {
+      "main": [
+        [
+          {
+            "node": "MERGE_CTX_USER15",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "MERGE_CTX_USER16": {
+      "main": [
+        [
+          {
+            "node": "FN_PARSE_PHRASES",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TG_PREPARE_DOC4": {
+      "main": [
+        [
+          {
+            "node": "Call '2_save_session_final'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "REDIS_GET_SESSION_CLB_GEN",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "Call '2_save_session_final'1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TG_PREPARE_DOC1": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "694f2007-afcf-4911-879a-5be89f4d5e0c",
+  "meta": {
+    "instanceId": "784907556f0c89efbde9ba288f0c0441c5b09242030c81d05d67aac99d485958"
+  },
+  "id": "ArnuV47WgGlIG7ju",
+  "tags": []
+}

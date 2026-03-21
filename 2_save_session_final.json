@@ -1,0 +1,151 @@
+{
+  "name": "2_save_session_final",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "get",
+        "propertyName": "session",
+        "key": "=razresheno:sess:{{ $json.tg_user_id }}",
+        "options": {
+          "dotNotation": true
+        }
+      },
+      "id": "cf2f0d0d-955d-41e1-89d8-32ac4505dc27",
+      "name": "GET_SESSION_FOR_FINAL",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "credentials": {
+        "redis": {
+          "id": "L8CJmx035hDrVPs3",
+          "name": "Redis razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// START__FN_PARSE_SESSION_FOR_INLINE (универсальный)\n\n// где может лежать строка/объект сессии\nconst raw =\n  $json.session ??\n  $json.variant_raw ??          // <-- ВАЖНО: твой текущий кейс\n  $json.redis?.session ??\n  $json.redis?.data ??\n  $json.data ??\n  $json.session_raw ??\n  null;\n\nlet sess = {};\n\ntry {\n  let parsed = raw;\n\n  // если пришёл объект — ок\n  // если пришла строка — парсим (иногда бывает \"JSON в JSON\", поэтому два раза)\n  if (typeof parsed === \"string\") parsed = JSON.parse(parsed);\n  if (typeof parsed === \"string\") parsed = JSON.parse(parsed);\n\n  // иногда PG/Redis возвращают массив строк/объектов\n  if (Array.isArray(parsed)) parsed = parsed[0];\n\n  if (parsed && typeof parsed === \"object\" && !Array.isArray(parsed)) {\n    sess = parsed;\n  }\n} catch (e) {\n  sess = {};\n}\n\n// дефолты/нормализация\nsess.active_request_id = sess.active_request_id ?? null;\nsess.awaiting = sess.awaiting ?? \"none\";\nsess.current_variant_idx = sess.current_variant_idx ?? \"0\";\nsess.last_variant_idx = sess.last_variant_idx ?? \"0\";\nsess.recipient_name = sess.recipient_name ?? null;\nsess.last_inline_message_id = sess.last_inline_message_id ?? null;\n\nreturn [{ json: { ...$json, session: sess } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "id": "efae8ec2-5ee9-4c89-8c9a-581b80fab2aa",
+      "name": "FN_PARSE_SESSION_FOR_FINAL"
+    },
+    {
+      "parameters": {
+        "jsCode": "let session = $json.session;\nif (!session || typeof session !== \"object\") session = {};\n\nconst resp = $json.body ?? $json; // если HTTP Request возвращает full response\n\nconst msgId =\n  resp.result?.message_id ??\n  resp.message_id ??\n  null;\n\nif (msgId) {\n  session.last_inline_message_id = String(msgId);\n}\n\nreturn [{ json: { ...$json, session } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        0
+      ],
+      "id": "19f1c311-4d7a-4101-babe-2c2bae5ce1b1",
+      "name": "FN_PATCH_LAST_FINAL"
+    },
+    {
+      "parameters": {
+        "operation": "set",
+        "key": "=razresheno:sess:{{ $('When Executed by Another Workflow').item.json.tg_user_id }}",
+        "value": "={{ JSON.stringify($json.session || {}) }}",
+        "keyType": "string",
+        "expire": true,
+        "ttl": 86400
+      },
+      "id": "0a5c73d0-3858-4353-bbbb-e994b4d51c49",
+      "name": "REDIS_SET_SESSION_FINAL",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        608,
+        0
+      ],
+      "credentials": {
+        "redis": {
+          "id": "L8CJmx035hDrVPs3",
+          "name": "Redis razresheno"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -208,
+        0
+      ],
+      "id": "f175b30d-72a0-4073-8738-79b99fc95f1e",
+      "name": "When Executed by Another Workflow"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "GET_SESSION_FOR_FINAL": {
+      "main": [
+        [
+          {
+            "node": "FN_PARSE_SESSION_FOR_FINAL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FN_PARSE_SESSION_FOR_FINAL": {
+      "main": [
+        [
+          {
+            "node": "FN_PATCH_LAST_FINAL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FN_PATCH_LAST_FINAL": {
+      "main": [
+        [
+          {
+            "node": "REDIS_SET_SESSION_FINAL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "GET_SESSION_FOR_FINAL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "68d498e5-8849-455f-b936-e15065499a22",
+  "meta": {
+    "instanceId": "784907556f0c89efbde9ba288f0c0441c5b09242030c81d05d67aac99d485958"
+  },
+  "id": "eUEULrK9LXoOY54R",
+  "tags": []
+}
