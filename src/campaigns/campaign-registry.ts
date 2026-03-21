@@ -1,5 +1,5 @@
 import type { CampaignDefinition } from "./campaign-definition.js";
-import { march8RazreshenoCampaign } from "./march8-razresheno-campaign.js";
+import { march8RazreshenoCampaign } from "./march8-razresheno/index.js";
 
 export const campaignRegistry: Record<string, CampaignDefinition> = {
   "march8-razresheno": march8RazreshenoCampaign
@@ -13,4 +13,8 @@ export function getCampaignDefinition(campaignId = "march8-razresheno"): Campaig
   }
 
   return campaign;
+}
+
+export function listCampaignIds(): string[] {
+  return Object.keys(campaignRegistry).sort();
 }
