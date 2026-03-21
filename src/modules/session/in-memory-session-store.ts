@@ -1,5 +1,5 @@
 import type { BotSession } from "../../domain/session.js";
-import type { SessionStore } from "./session-store.js";
+import type { SessionStore } from "../../engine/state/session-store.js";
 
 export class InMemorySessionStore implements SessionStore {
   private readonly sessions = new Map<string, BotSession>();

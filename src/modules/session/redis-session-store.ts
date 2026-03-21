@@ -5,8 +5,8 @@ import {
   type BotSession,
   type LegacyBotSession
 } from "../../domain/session.js";
+import type { SessionStore } from "../../engine/state/session-store.js";
 import { buildCampaignRedisSessionKey } from "../../campaigns/current-campaign.js";
-import type { SessionStore } from "./session-store.js";
 
 export class RedisSessionStore implements SessionStore {
   constructor(private readonly redis: RedisClient) {}

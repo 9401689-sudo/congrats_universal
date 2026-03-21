@@ -1,6 +1,6 @@
 import type { FastifyBaseLogger } from "fastify";
 
-import type { TelegramGateway } from "./telegram-gateway.js";
+import type { TelegramGateway } from "../../engine/telegram/telegram-gateway.js";
 
 export class LoggingTelegramGateway implements TelegramGateway {
   constructor(private readonly logger: FastifyBaseLogger) {}

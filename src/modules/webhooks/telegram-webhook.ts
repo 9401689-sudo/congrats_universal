@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 
-import { normalizeTelegramUpdate } from "../telegram/normalize-telegram-update.js";
+import { normalizeTelegramUpdate } from "../../engine/telegram/normalize-telegram-update.js";
 import { TelegramApplicationService } from "../app/telegram-application-service.js";
 
 export function registerTelegramWebhook(app: FastifyInstance): void {

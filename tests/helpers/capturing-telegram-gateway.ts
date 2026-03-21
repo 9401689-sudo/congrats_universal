@@ -1,4 +1,4 @@
-import type { TelegramGateway } from "../../src/modules/telegram/telegram-gateway.js";
+import type { TelegramGateway } from "../../src/engine/telegram/telegram-gateway.js";
 
 export type SentTelegramMessage = {
   chatId: string;

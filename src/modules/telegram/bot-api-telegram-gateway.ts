@@ -1,6 +1,6 @@
 import { openAsBlob } from "node:fs";
 
-import type { TelegramGateway } from "./telegram-gateway.js";
+import type { TelegramGateway } from "../../engine/telegram/telegram-gateway.js";
 
 export class BotApiTelegramGateway implements TelegramGateway {
   private readonly apiToken: string;
