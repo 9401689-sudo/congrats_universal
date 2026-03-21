@@ -3,12 +3,12 @@ import assert from "node:assert/strict";
 
 import { TelegramApplicationService } from "../src/engine/app/telegram-application-service.js";
 import { normalizeTelegramUpdate } from "../src/engine/telegram/normalize-telegram-update.js";
-import { InMemoryUsersRepository } from "../src/modules/users/in-memory-users-repository.js";
-import { InMemoryRequestsRepository } from "../src/modules/requests/in-memory-requests-repository.js";
-import { InMemorySessionStore } from "../src/modules/session/in-memory-session-store.js";
-import { InMemoryVariantsRepository } from "../src/modules/variants/in-memory-variants-repository.js";
-import { FakePaymentService } from "../src/modules/payments/fake-payment-service.js";
-import { InMemoryPaymentsRepository } from "../src/modules/payments/in-memory-payments-repository.js";
+import { InMemoryUsersRepository } from "../src/adapters/users/in-memory-users-repository.js";
+import { InMemoryRequestsRepository } from "../src/adapters/requests/in-memory-requests-repository.js";
+import { InMemorySessionStore } from "../src/adapters/session/in-memory-session-store.js";
+import { InMemoryVariantsRepository } from "../src/adapters/variants/in-memory-variants-repository.js";
+import { FakePaymentService } from "../src/adapters/payments/fake-payment-service.js";
+import { InMemoryPaymentsRepository } from "../src/adapters/payments/in-memory-payments-repository.js";
 import { CapturingTelegramGateway } from "./helpers/capturing-telegram-gateway.js";
 
 function createService() {

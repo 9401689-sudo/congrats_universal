@@ -16,9 +16,9 @@ import type { VariantsRepository } from "../repositories/variants-repository.js"
 import type { PreviewRenderer } from "../rendering/preview-renderer.js";
 import type { SessionStore } from "../state/session-store.js";
 import type { TelegramGateway } from "../telegram/telegram-gateway.js";
-import { InMemoryRequestsRepository } from "../../modules/requests/in-memory-requests-repository.js";
-import { InMemoryUsersRepository } from "../../modules/users/in-memory-users-repository.js";
-import { buildPreviewVariant } from "../../modules/variants/preview-builder.js";
+import { InMemoryRequestsRepository } from "../../adapters/requests/in-memory-requests-repository.js";
+import { InMemoryUsersRepository } from "../../adapters/users/in-memory-users-repository.js";
+import { buildPreviewVariant } from "../../adapters/variants/preview-builder.js";
 
 export class TelegramApplicationService {
   private static readonly START_CHAT_CLEANUP_WINDOW = 200;
@@ -154,7 +154,10 @@ export class TelegramApplicationService {
           this.usersRepository instanceof InMemoryUsersRepository &&
           this.requestsRepository instanceof InMemoryRequestsRepository
         ) {
-          this.requestsRepository.bindTelegramUser(session.tgUserId, user.id);
+          (this.requestsRepository as InMemoryRequestsRepository).bindTelegramUser(
+            session.tgUserId,
+            user.id
+          );
         }
 
         const request = await this.requestsRepository.createOpenRequest(user.id);

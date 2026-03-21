@@ -5,8 +5,8 @@ import { DeliveryWorkerService } from "../src/engine/delivery/delivery-worker-se
 import type { DeliveryTransport } from "../src/engine/delivery/delivery-transport.js";
 import type { RenderingAdapter } from "../src/engine/rendering/rendering-adapter.js";
 import type { DeliveriesRepository } from "../src/engine/repositories/deliveries-repository.js";
-import { InMemoryDocumentsRepository } from "../src/modules/documents/in-memory-documents-repository.js";
-import { InMemoryRequestsRepository } from "../src/modules/requests/in-memory-requests-repository.js";
+import { InMemoryDocumentsRepository } from "../src/adapters/documents/in-memory-documents-repository.js";
+import { InMemoryRequestsRepository } from "../src/adapters/requests/in-memory-requests-repository.js";
 
 test("delivery worker renders, sends and marks delivery as sent", async () => {
   const documentsRepository = new InMemoryDocumentsRepository();

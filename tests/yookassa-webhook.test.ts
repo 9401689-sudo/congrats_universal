@@ -2,10 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { YookassaWebhookService } from "../src/engine/payments/yookassa-webhook-service.js";
-import { InMemoryDocumentsRepository } from "../src/modules/documents/in-memory-documents-repository.js";
-import { InMemoryDeliveriesRepository } from "../src/modules/deliveries/in-memory-deliveries-repository.js";
-import { InMemoryPaymentsRepository } from "../src/modules/payments/in-memory-payments-repository.js";
-import { InMemoryRequestsRepository } from "../src/modules/requests/in-memory-requests-repository.js";
+import { InMemoryDocumentsRepository } from "../src/adapters/documents/in-memory-documents-repository.js";
+import { InMemoryDeliveriesRepository } from "../src/adapters/deliveries/in-memory-deliveries-repository.js";
+import { InMemoryPaymentsRepository } from "../src/adapters/payments/in-memory-payments-repository.js";
+import { InMemoryRequestsRepository } from "../src/adapters/requests/in-memory-requests-repository.js";
 
 test("payment.succeeded for tariff 199 creates scheduled delivery", async () => {
   const paymentsRepository = new InMemoryPaymentsRepository();
