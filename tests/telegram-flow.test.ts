@@ -1252,6 +1252,8 @@ test("start performs best-effort chat cleanup", async () => {
     })
   );
 
+  await new Promise((resolve) => setImmediate(resolve));
+
   assert.ok(!telegramGateway.deletedMessageIds.includes("101:50"));
   assert.ok(telegramGateway.deletedMessageIds.includes("101:49"));
   assert.ok(telegramGateway.deletedMessageIds.includes("101:1"));

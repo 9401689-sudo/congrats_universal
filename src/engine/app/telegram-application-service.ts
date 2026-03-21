@@ -22,6 +22,7 @@ import { buildPreviewVariant } from "../../adapters/variants/preview-builder.js"
 
 export class TelegramApplicationService {
   private static readonly START_CHAT_CLEANUP_WINDOW = 200;
+  private static readonly START_CHAT_CLEANUP_CONCURRENCY = 12;
 
   constructor(
     private readonly usersRepository: UsersRepository,
@@ -43,7 +44,7 @@ export class TelegramApplicationService {
       (await this.sessionStore.get(event.tgUserId)) ?? createEmptySession(event.tgUserId);
 
     if (event.isStart) {
-      await this.cleanupChatOnStart(currentSession, event);
+      this.kickOffChatCleanup(currentSession, event);
     }
 
     const { effects, session } = handleBotEvent(currentSession, event);
@@ -750,13 +751,35 @@ export class TelegramApplicationService {
       1,
       upperBound - TelegramApplicationService.START_CHAT_CLEANUP_WINDOW + 1
     );
+    const messageIds: string[] = [];
     for (let id = upperBound; id >= lowerBound; id -= 1) {
-      try {
-        await this.telegramGateway.deleteMessage({
-          chatId,
-          messageId: String(id)
-        });
-      } catch {}
+      messageIds.push(String(id));
     }
+
+    for (
+      let batchStart = 0;
+      batchStart < messageIds.length;
+      batchStart += TelegramApplicationService.START_CHAT_CLEANUP_CONCURRENCY
+    ) {
+      const batch = messageIds.slice(
+        batchStart,
+        batchStart + TelegramApplicationService.START_CHAT_CLEANUP_CONCURRENCY
+      );
+
+      await Promise.all(
+        batch.map(async (id) => {
+          try {
+            await this.telegramGateway.deleteMessage({
+              chatId,
+              messageId: id
+            });
+          } catch {}
+        })
+      );
+    }
+  }
+
+  private kickOffChatCleanup(session: BotSession, event: NormalizedTelegramEvent): void {
+    void this.cleanupChatOnStart(session, event).catch(() => {});
   }
 }
