@@ -11,4 +11,8 @@ export class InMemorySessionStore implements SessionStore {
   async set(session: BotSession): Promise<void> {
     this.sessions.set(session.tgUserId, session);
   }
+
+  async delete(tgUserId: string): Promise<void> {
+    this.sessions.delete(tgUserId);
+  }
 }

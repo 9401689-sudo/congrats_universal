@@ -6,23 +6,31 @@ import { InMemoryDocumentsRepository } from "../src/adapters/documents/in-memory
 import { InMemoryDeliveriesRepository } from "../src/adapters/deliveries/in-memory-deliveries-repository.js";
 import { InMemoryPaymentsRepository } from "../src/adapters/payments/in-memory-payments-repository.js";
 import { InMemoryRequestsRepository } from "../src/adapters/requests/in-memory-requests-repository.js";
+import { InMemorySessionStore } from "../src/adapters/session/in-memory-session-store.js";
+import { createEmptySession } from "../src/domain/session.js";
 
 test("payment.succeeded for tariff 199 creates scheduled delivery", async () => {
   const paymentsRepository = new InMemoryPaymentsRepository();
   const requestsRepository = new InMemoryRequestsRepository();
   const documentsRepository = new InMemoryDocumentsRepository();
   const deliveriesRepository = new InMemoryDeliveriesRepository();
+  const sessionStore = new InMemorySessionStore();
 
   const request = await requestsRepository.createOpenRequest(1);
   await requestsRepository.setSelectedVariant(request.id, 1);
   await requestsRepository.setInitiatorTimezone(request.id, "Europe/Moscow");
   await requestsRepository.setDeliveryManual(request.id);
+  await sessionStore.set({
+    ...createEmptySession("101"),
+    activeRequestId: request.id
+  });
 
   const service = new YookassaWebhookService(
     paymentsRepository,
     requestsRepository,
     documentsRepository,
-    deliveriesRepository
+    deliveriesRepository,
+    sessionStore
   );
 
   await service.handleWebhook({
@@ -39,6 +47,7 @@ test("payment.succeeded for tariff 199 creates scheduled delivery", async () => 
 
   const deliveryIds = await deliveriesRepository.listDueDeliveryIds(10);
   assert.equal(deliveryIds.length, 1);
+  assert.equal(await sessionStore.get("101"), null);
 });
 
 test("payment.succeeded for tariff 149 finalizes document without delivery", async () => {
@@ -46,15 +55,21 @@ test("payment.succeeded for tariff 149 finalizes document without delivery", asy
   const requestsRepository = new InMemoryRequestsRepository();
   const documentsRepository = new InMemoryDocumentsRepository();
   const deliveriesRepository = new InMemoryDeliveriesRepository();
+  const sessionStore = new InMemorySessionStore();
 
   const request = await requestsRepository.createOpenRequest(1);
   await requestsRepository.setSelectedVariant(request.id, 1);
+  await sessionStore.set({
+    ...createEmptySession("101"),
+    activeRequestId: request.id
+  });
 
   const service = new YookassaWebhookService(
     paymentsRepository,
     requestsRepository,
     documentsRepository,
-    deliveriesRepository
+    deliveriesRepository,
+    sessionStore
   );
 
   await service.handleWebhook({
@@ -72,4 +87,5 @@ test("payment.succeeded for tariff 149 finalizes document without delivery", asy
   const payment = await paymentsRepository.findByProviderPaymentId("yk_149");
   assert.equal(payment?.tariff, "149");
   assert.equal((await deliveriesRepository.listDueDeliveryIds(10)).length, 0);
+  assert.equal(await sessionStore.get("101"), null);
 });

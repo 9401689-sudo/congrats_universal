@@ -12,6 +12,7 @@ import type { PaymentsRepository } from "./payments-repository.js";
 import type { DeliveriesRepository } from "../repositories/deliveries-repository.js";
 import type { DocumentsRepository } from "../repositories/documents-repository.js";
 import type { RequestsRepository } from "../repositories/requests-repository.js";
+import type { SessionStore } from "../state/session-store.js";
 
 type YookassaWebhookBody = {
   event?: string;
@@ -30,7 +31,8 @@ export class YookassaWebhookService {
     private readonly paymentsRepository: PaymentsRepository,
     private readonly requestsRepository: RequestsRepository,
     private readonly documentsRepository: DocumentsRepository,
-    private readonly deliveriesRepository: DeliveriesRepository
+    private readonly deliveriesRepository: DeliveriesRepository,
+    private readonly sessionStore: SessionStore
   ) {}
 
   async handleWebhook(body: YookassaWebhookBody): Promise<{ ok: true }> {
@@ -92,6 +94,7 @@ export class YookassaWebhookService {
     if (tariff === "149") {
       await this.documentsRepository.setFinalFileId(document.id, `generated_${document.id}`);
       await this.requestsRepository.closeOpenRequest(requestId);
+      await this.sessionStore.delete(tgUserId);
       return { ok: true };
     }
 
@@ -104,6 +107,7 @@ export class YookassaWebhookService {
       )
     });
     await this.requestsRepository.closeOpenRequest(requestId);
+    await this.sessionStore.delete(tgUserId);
     return { ok: true };
   }
 }

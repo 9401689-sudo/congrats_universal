@@ -7,7 +7,8 @@ export function registerYookassaWebhook(app: FastifyInstance): void {
       app.appContext.paymentsRepository,
       app.appContext.requestsRepository,
       app.appContext.documentsRepository,
-      app.appContext.deliveriesRepository
+      app.appContext.deliveriesRepository,
+      app.appContext.sessionStore
     );
     const result = await service.handleWebhook(request.body as Record<string, unknown>);
     app.log.info({ body: request.body, result }, "YooKassa webhook received");

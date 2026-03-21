@@ -29,4 +29,8 @@ export class RedisSessionStore implements SessionStore {
       86400
     );
   }
+
+  async delete(tgUserId: string): Promise<void> {
+    await this.redis.del(buildCampaignRedisSessionKey(tgUserId));
+  }
 }
