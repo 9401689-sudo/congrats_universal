@@ -741,11 +741,16 @@ export class TelegramApplicationService {
       return;
     }
 
+    const upperBound = currentMessageId - 1;
+    if (upperBound < 1) {
+      return;
+    }
+
     const lowerBound = Math.max(
       1,
-      currentMessageId - TelegramApplicationService.START_CHAT_CLEANUP_WINDOW
+      upperBound - TelegramApplicationService.START_CHAT_CLEANUP_WINDOW + 1
     );
-    for (let id = currentMessageId; id >= lowerBound; id -= 1) {
+    for (let id = upperBound; id >= lowerBound; id -= 1) {
       try {
         await this.telegramGateway.deleteMessage({
           chatId,

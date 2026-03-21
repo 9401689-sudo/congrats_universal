@@ -1252,6 +1252,7 @@ test("start performs best-effort chat cleanup", async () => {
     })
   );
 
-  assert.ok(telegramGateway.deletedMessageIds.includes("101:50"));
+  assert.ok(!telegramGateway.deletedMessageIds.includes("101:50"));
+  assert.ok(telegramGateway.deletedMessageIds.includes("101:49"));
   assert.ok(telegramGateway.deletedMessageIds.includes("101:1"));
 });
