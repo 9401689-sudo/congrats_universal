@@ -16,7 +16,7 @@ import type { RequestsRepository } from "../requests/requests-repository.js";
 import type { UsersRepository } from "../users/users-repository.js";
 import type { VariantsRepository } from "../variants/variants-repository.js";
 import { buildPreviewVariant } from "../variants/preview-builder.js";
-import { handleBotEvent } from "../bot/handle-bot-event.js";
+import { handleBotEvent } from "../../engine/bot/handle-bot-event.js";
 import { InMemoryUsersRepository } from "../users/in-memory-users-repository.js";
 import { InMemoryRequestsRepository } from "../requests/in-memory-requests-repository.js";
 
