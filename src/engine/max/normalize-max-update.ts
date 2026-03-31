@@ -5,9 +5,16 @@ type MaxUpdate = Record<string, any>;
 export function normalizeMaxUpdate(input: unknown): NormalizedChannelEvent {
   const update = (input ?? {}) as MaxUpdate;
   const updateType = typeof update.update_type === "string" ? update.update_type : "unknown";
-  const user = update.user ?? update.message?.sender ?? update.message?.user ?? null;
+  const user =
+    update.user ??
+    update.callback?.user ??
+    update.callback?.sender ??
+    update.message?.sender ??
+    update.message?.user ??
+    null;
   const text =
     update.message?.body?.text ??
+    update.callback?.message?.body?.text ??
     update.message?.text ??
     update.text ??
     null;
@@ -34,8 +41,15 @@ export function normalizeMaxUpdate(input: unknown): NormalizedChannelEvent {
   const username = user?.username ? String(user.username) : null;
   const resolvedChatId =
     userId ??
+    (update.callback?.user?.user_id != null
+      ? String(update.callback.user.user_id)
+      : null) ??
     (update.chat_id != null
       ? String(update.chat_id)
+      : update.callback?.chat_id != null
+        ? String(update.callback.chat_id)
+        : update.callback?.message?.recipient?.chat_id != null
+          ? String(update.callback.message.recipient.chat_id)
       : update.message?.chat_id != null
         ? String(update.message.chat_id)
         : null);
@@ -45,7 +59,11 @@ export function normalizeMaxUpdate(input: unknown): NormalizedChannelEvent {
     botUnblocked: false,
     callbackData: callbackData != null ? String(callbackData) : null,
     callbackMessageId:
-      update.message?.message_id != null ? String(update.message.message_id) : null,
+      update.callback?.message?.message_id != null
+        ? String(update.callback.message.message_id)
+        : update.message?.message_id != null
+          ? String(update.message.message_id)
+          : null,
     callbackQueryId:
       update.callback?.callback_id != null ? String(update.callback.callback_id) : null,
     channel: "max",
