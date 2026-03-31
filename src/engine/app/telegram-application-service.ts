@@ -136,7 +136,7 @@ export class TelegramApplicationService {
       case "2_START_INTRO":
         await this.telegramGateway.sendMessage({
           chatId: event.chatId ?? session.chatId ?? session.tgUserId,
-          text: currentCampaignTexts.prompts.chooseAction,
+          text: currentCampaignTexts.prompts.aboutBureau,
           replyMarkup: session.activeRequestId
             ? {
                 inline_keyboard: [

@@ -54,6 +54,7 @@ test("start -> start_new -> recipient_name -> gen_first updates session and send
     })
   );
 
+  assert.match(telegramGateway.messages.at(-1)?.text ?? "", /Официальная инстанция/);
   assert.equal(telegramGateway.messages.at(-1)?.replyMarkup?.inline_keyboard[0]?.[0]?.callback_data, "START_NEW");
 
   await service.processEvent(
@@ -90,6 +91,62 @@ test("start -> start_new -> recipient_name -> gen_first updates session and send
   assert.equal(session?.lastVariantIdx, 1);
   assert.equal(telegramGateway.messages.at(-1)?.replyMarkup?.inline_keyboard[0]?.[0]?.callback_data, "GEN_NEXT");
   assert.equal(telegramGateway.messages.at(-1)?.replyMarkup?.inline_keyboard[1]?.[0]?.callback_data, "GO_SEAL");
+});
+
+test("/start with active request shows about text and continue or restart actions", async () => {
+  const sessionStore = new InMemorySessionStore();
+  const telegramGateway = new CapturingTelegramGateway();
+  const service = new TelegramApplicationService(
+    new InMemoryUsersRepository(),
+    new InMemoryRequestsRepository(),
+    sessionStore,
+    telegramGateway,
+    new InMemoryVariantsRepository(),
+    new FakePaymentService(),
+    new InMemoryPaymentsRepository()
+  );
+
+  await sessionStore.set({
+    activeRequestId: "555",
+    awaiting: "none",
+    chatId: "101",
+    chatType: "private",
+    currentVariantIdx: 1,
+    customerEmail: null,
+    customerEmailRequestId: null,
+    deliveryMethodRequestId: null,
+    initiatorTimezone: null,
+    lastCallbackData: null,
+    lastBotMessageIds: [],
+    lastEventType: null,
+    lastInlineMessageId: null,
+    lastUpdateId: null,
+    lastVariantIdx: 1,
+    recipientName: "Мария",
+    tariffPending: null,
+    tgFirstName: "Ivan",
+    tgLastName: null,
+    tgUserId: "101",
+    tgUsername: "ivan",
+    tzReturnTo: null
+  });
+
+  await service.processEvent(
+    normalizeTelegramUpdate({
+      message: {
+        chat: { id: 101, type: "private" },
+        from: { first_name: "Ivan", id: 101, username: "ivan" },
+        message_id: 1,
+        text: "/start"
+      },
+      update_id: 1
+    })
+  );
+
+  const lastMessage = telegramGateway.messages.at(-1);
+  assert.match(lastMessage?.text ?? "", /Официальная инстанция/);
+  assert.equal(lastMessage?.replyMarkup?.inline_keyboard[0]?.[0]?.callback_data, "START_CONTINUE");
+  assert.equal(lastMessage?.replyMarkup?.inline_keyboard[1]?.[0]?.callback_data, "START_FORCE_NEW");
 });
 
 test("start_continue resumes draft and triggers generation when variants are not created yet", async () => {
