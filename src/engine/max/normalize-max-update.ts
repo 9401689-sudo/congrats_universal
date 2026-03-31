@@ -32,6 +32,13 @@ export function normalizeMaxUpdate(input: unknown): NormalizedChannelEvent {
   const firstName = user?.first_name ? String(user.first_name) : user?.name ? String(user.name) : null;
   const lastName = user?.last_name ? String(user.last_name) : null;
   const username = user?.username ? String(user.username) : null;
+  const resolvedChatId =
+    userId ??
+    (update.chat_id != null
+      ? String(update.chat_id)
+      : update.message?.chat_id != null
+        ? String(update.message.chat_id)
+        : null);
 
   return {
     botBlocked: false,
@@ -42,12 +49,7 @@ export function normalizeMaxUpdate(input: unknown): NormalizedChannelEvent {
     callbackQueryId:
       update.callback?.callback_id != null ? String(update.callback.callback_id) : null,
     channel: "max",
-    chatId:
-      update.chat_id != null
-        ? String(update.chat_id)
-        : update.message?.chat_id != null
-          ? String(update.message.chat_id)
-          : null,
+    chatId: resolvedChatId,
     chatType: update.chat_type != null ? String(update.chat_type) : null,
     currency: null,
     eventType,

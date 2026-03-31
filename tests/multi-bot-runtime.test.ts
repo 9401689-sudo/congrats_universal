@@ -170,6 +170,7 @@ test("max webhook route can target a MAX runtime", async (t) => {
   const maxContext = app.appContexts["march8-max"];
   const session = await maxContext.sessionStore.get("777");
   assert.equal(session?.tgUserId, "777");
+  assert.equal(session?.chatId, "777");
 });
 
 test("max webhook validates runtime secret when configured", async (t) => {
