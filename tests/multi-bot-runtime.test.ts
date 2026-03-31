@@ -283,3 +283,82 @@ test("normalize MAX callback keeps user-scoped reply target", async (t) => {
   assert.equal(session?.chatId, "70722561");
   assert.equal(session?.lastCallbackData, "START_NEW");
 });
+
+test("stale MAX callback retry is ignored when update id is older than session", async (t) => {
+  const app = buildApp(
+    loadConfig({
+      BOT_RUNTIMES_JSON: JSON.stringify([
+        {
+          id: "march8-max",
+          channel: "max",
+          campaignId: "march8-razresheno"
+        }
+      ]),
+      DEFAULT_BOT_ID: "march8-max",
+      HOST: "127.0.0.1",
+      NODE_ENV: "test",
+      PORT: "3001",
+      RENDER_OUTPUT_DIR: ".local-renders"
+    })
+  );
+
+  t.after(async () => {
+    await app.close();
+  });
+
+  const context = app.appContexts["march8-max"];
+  await context.sessionStore.set({
+    activeRequestId: "999",
+    awaiting: "none",
+    chatId: "70722561",
+    chatType: null,
+    currentVariantIdx: 1,
+    customerEmail: null,
+    customerEmailRequestId: null,
+    deliveryMethodRequestId: null,
+    initiatorTimezone: null,
+    lastCallbackData: "GEN_FIRST",
+    lastBotMessageIds: [],
+    lastEventType: "callback",
+    lastInlineMessageId: null,
+    lastUpdateId: 200,
+    lastVariantIdx: 1,
+    recipientName: "Илья",
+    tariffPending: null,
+    tgFirstName: "Илья",
+    tgLastName: null,
+    tgUserId: "70722561",
+    tgUsername: null,
+    tzReturnTo: null
+  });
+
+  const response = await app.inject({
+    method: "POST",
+    url: "/webhooks/max/march8-max",
+    payload: {
+      update_type: "message_callback",
+      timestamp: 100,
+      callback: {
+        payload: "START_NEW",
+        user: {
+          user_id: 70722561,
+          name: "Ilya"
+        },
+        message: {
+          recipient: {
+            chat_id: 250645149
+          },
+          message_id: 101
+        }
+      }
+    }
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json(), { ok: true });
+
+  const session = await context.sessionStore.get("70722561");
+  assert.equal(session?.activeRequestId, "999");
+  assert.equal(session?.awaiting, "none");
+  assert.equal(session?.lastUpdateId, 200);
+});

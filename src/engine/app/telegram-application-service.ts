@@ -43,6 +43,14 @@ export class TelegramApplicationService {
     const currentSession =
       (await this.sessionStore.get(event.userId)) ?? createEmptySession(event.userId);
 
+    if (
+      event.updateId != null &&
+      currentSession.lastUpdateId != null &&
+      event.updateId <= currentSession.lastUpdateId
+    ) {
+      return currentSession;
+    }
+
     if (event.isStart) {
       this.kickOffChatCleanup(currentSession, event);
     }
