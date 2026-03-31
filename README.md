@@ -52,6 +52,8 @@ docker compose -f deploy/docker-compose.server.yml up -d --build
 - `GET /internal/state`
 - `POST /webhooks/telegram`
 - `POST /webhooks/telegram/:botId`
+- `POST /webhooks/max`
+- `POST /webhooks/max/:botId`
 - `POST /webhooks/yookassa`
 - `POST /internal/deliveries/run-once`
 
@@ -77,6 +79,7 @@ npm run make:campaign -- birthday-classic
 - If `PYTHON_RENDERER_BIN` and `PYTHON_RENDERER_SCRIPT_PATH` are set, the app uses the imported Python renderer from [render_doc.py](/C:/1_Work/Работа/Сайты/Боты/Congrats/renderer/legacy/render_doc.py).
 - For a safe parallel cutover, run this project on port `3001` and point `bot2.doorsvip.ru` to it first.
 - The first multi-bot runtime layer is already present: one process can expose separate Telegram webhook paths per `botId`.
+- The first multi-channel layer is also present: runtimes can now declare `channel: "telegram"` or `channel: "max"`.
 - `campaign` and `bot runtime` are separate concepts now: campaign describes product/content, runtime describes token/keys/public entrypoint.
 - Campaign authoring guidance lives in [campaign-authoring.md](/C:/1_Work/Работа/Сайты/Боты/congrats_universal/docs/campaign-authoring.md).
 - The current campaign already uses the package layout at [src/campaigns/march8-razresheno/index.ts](/C:/1_Work/Работа/Сайты/Боты/congrats_universal/src/campaigns/march8-razresheno/index.ts), which is the template for future campaigns.

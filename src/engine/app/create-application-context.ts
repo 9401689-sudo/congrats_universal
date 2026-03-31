@@ -1,6 +1,7 @@
 import type { FastifyBaseLogger } from "fastify";
 import type { Pool } from "pg";
 
+import type { ChannelGateway } from "../channel/channel-gateway.js";
 import type { AppConfig } from "../../config/env.js";
 import type { DeliveryTransport } from "../delivery/delivery-transport.js";
 import type { PaymentService } from "../payments/payment-service.js";
@@ -31,6 +32,7 @@ import { FakePaymentService } from "../../adapters/payments/fake-payment-service
 import { InMemoryPaymentsRepository } from "../../adapters/payments/in-memory-payments-repository.js";
 import { PostgresPaymentsRepository } from "../../adapters/payments/postgres-payments-repository.js";
 import { YookassaPaymentService } from "../../adapters/payments/yookassa-payment-service.js";
+import { LoggingChannelGateway } from "../../adapters/channel/logging-channel-gateway.js";
 import { InMemoryRequestsRepository } from "../../adapters/requests/in-memory-requests-repository.js";
 import { PostgresRequestsRepository } from "../../adapters/requests/postgres-requests-repository.js";
 import { createSessionStore } from "../../adapters/session/create-session-store.js";
@@ -44,6 +46,7 @@ import { PythonPreviewRenderer } from "../../adapters/variants/python-preview-re
 export type ApplicationContext = {
   botRuntime: {
     campaignId: string;
+    channel: "max" | "telegram";
     id: string;
   };
   configSummary: {
@@ -60,7 +63,7 @@ export type ApplicationContext = {
   renderingAdapter: RenderingAdapter;
   requestsRepository: RequestsRepository;
   sessionStore: SessionStore;
-  telegramGateway: TelegramGateway;
+  telegramGateway: ChannelGateway;
   usersRepository: UsersRepository;
   variantsRepository: VariantsRepository;
   paymentService: PaymentService;
@@ -93,11 +96,16 @@ export function createApplicationContext(
     ? new PostgresDeliveriesRepository(pgPool)
     : new InMemoryDeliveriesRepository();
 
-  const telegramGateway = runtime.telegramBotToken
-    ? new BotApiTelegramGateway(runtime.telegramBotToken)
-    : new LoggingTelegramGateway(logger);
-  const deliveryTransport = runtime.telegramBotToken
-    ? new BotApiDeliveryTransport(runtime.telegramBotToken)
+  const botToken = runtime.botToken ?? runtime.telegramBotToken;
+  const telegramGateway: ChannelGateway =
+    runtime.channel === "telegram"
+      ? botToken
+        ? new BotApiTelegramGateway(botToken)
+        : new LoggingTelegramGateway(logger)
+      : new LoggingChannelGateway(logger, "max");
+  const deliveryTransport =
+    runtime.channel === "telegram" && botToken
+    ? new BotApiDeliveryTransport(botToken)
     : new LoggingDeliveryTransport(logger);
   const pythonRendererWorkerClient =
     config.pythonRendererBin && config.pythonRendererScriptPath
@@ -136,12 +144,13 @@ export function createApplicationContext(
   return {
     botRuntime: {
       campaignId: runtime.campaignId,
+      channel: runtime.channel,
       id: runtime.id
     },
     configSummary: {
       hasDatabase: Boolean(config.databaseUrl),
       hasRedis: Boolean(config.redisUrl),
-      hasTelegramBotToken: Boolean(runtime.telegramBotToken),
+      hasTelegramBotToken: Boolean(botToken),
       hasYookassa: Boolean(
         runtime.yookassaShopId && runtime.yookassaSecretKey
       )

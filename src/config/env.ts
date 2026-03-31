@@ -2,7 +2,9 @@ import { z } from "zod";
 import type { BotRuntimeDefinition } from "../engine/runtime/bot-runtime-definition.js";
 
 const botRuntimeSchema = z.object({
+  botToken: z.string().min(1).optional(),
   campaignId: z.string().min(1),
+  channel: z.enum(["telegram", "max"]).default("telegram"),
   id: z.string().min(1),
   telegramBotToken: z.string().min(1).optional(),
   yookassaReturnUrl: z.string().url().optional(),
@@ -51,7 +53,9 @@ function parseBotRuntimes(env: z.infer<typeof envSchema>): Record<string, BotRun
 
   return {
     [env.DEFAULT_BOT_ID]: {
+      botToken: env.TELEGRAM_BOT_TOKEN,
       campaignId: env.CAMPAIGN_ID,
+      channel: "telegram",
       id: env.DEFAULT_BOT_ID,
       telegramBotToken: env.TELEGRAM_BOT_TOKEN,
       yookassaReturnUrl: env.YOOKASSA_RETURN_URL,

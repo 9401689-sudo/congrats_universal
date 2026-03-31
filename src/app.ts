@@ -3,6 +3,7 @@ import Fastify, { type FastifyInstance } from "fastify";
 import type { AppConfig } from "./config/env.js";
 import { createApplicationContext } from "./engine/app/create-application-context.js";
 import { registerInternalRoutes } from "./adapters/webhooks/internal-routes.js";
+import { registerMaxWebhook } from "./adapters/webhooks/max-webhook.js";
 import { registerTelegramWebhook } from "./adapters/webhooks/telegram-webhook.js";
 import { registerYookassaWebhook } from "./adapters/webhooks/yookassa-webhook.js";
 
@@ -33,6 +34,7 @@ export function buildApp(config: AppConfig): FastifyInstance {
   }));
 
   registerTelegramWebhook(app);
+  registerMaxWebhook(app);
   registerYookassaWebhook(app);
   registerInternalRoutes(app);
 

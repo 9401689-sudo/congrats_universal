@@ -124,13 +124,15 @@ Example:
 [
   {
     "id": "march8",
+    "channel": "telegram",
     "campaignId": "march8-razresheno",
-    "telegramBotToken": "123:aaa"
+    "botToken": "123:aaa"
   },
   {
-    "id": "birthday",
+    "id": "birthday-max",
+    "channel": "max",
     "campaignId": "birthday-classic",
-    "telegramBotToken": "456:bbb"
+    "botToken": "456:bbb"
   }
 ]
 ```
@@ -138,6 +140,11 @@ Example:
 The runtime contract now lives in:
 
 - [bot-runtime-definition.ts](/C:/1_Work/Работа/Сайты/Боты/congrats_universal/src/engine/runtime/bot-runtime-definition.ts)
+
+Current supported runtime channels:
+
+- `telegram`
+- `max`
 
 ## Before Creating The Next Campaign
 
