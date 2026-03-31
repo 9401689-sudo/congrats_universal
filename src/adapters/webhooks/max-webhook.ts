@@ -19,6 +19,14 @@ export function registerMaxWebhook(app: FastifyInstance): void {
       return { ok: false, error: "wrong_channel" };
     }
 
+    if (context.botRuntime.webhookSecret) {
+      const providedSecret = request.headers["x-max-bot-api-secret"];
+      if (providedSecret !== context.botRuntime.webhookSecret) {
+        app.log.warn({ botId }, "MAX webhook rejected due to invalid secret");
+        return { ok: false, error: "invalid_secret" };
+      }
+    }
+
     const event = normalizeMaxUpdate(request.body);
 
     if (!event.userId) {

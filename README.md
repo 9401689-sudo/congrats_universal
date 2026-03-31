@@ -69,6 +69,18 @@ npm test
 npm run make:campaign -- birthday-classic
 ```
 
+## MAX Webhook Setup
+
+1. Add a MAX runtime to `BOT_RUNTIMES_JSON`, for example `max-main`
+2. Choose a webhook URL such as `https://bot2.doorsvip.ru/webhooks/max/max-main`
+3. Register it in MAX:
+
+```bash
+npm run max:subscribe -- --bot-id max-main --url https://bot2.doorsvip.ru/webhooks/max/max-main
+```
+
+If you set `webhookSecret` in the runtime, the server will require `X-Max-Bot-Api-Secret` on incoming MAX webhook calls.
+
 ## Notes
 
 - If `DATABASE_URL` or `REDIS_URL` are missing, the app falls back to in-memory repositories for many flows.

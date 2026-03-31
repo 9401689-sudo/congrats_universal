@@ -171,3 +171,62 @@ test("max webhook route can target a MAX runtime", async (t) => {
   const session = await maxContext.sessionStore.get("777");
   assert.equal(session?.tgUserId, "777");
 });
+
+test("max webhook validates runtime secret when configured", async (t) => {
+  const app = buildApp(
+    loadConfig({
+      BOT_RUNTIMES_JSON: JSON.stringify([
+        {
+          id: "march8-max",
+          channel: "max",
+          campaignId: "march8-razresheno",
+          webhookSecret: "top-secret"
+        }
+      ]),
+      DEFAULT_BOT_ID: "march8-max",
+      HOST: "127.0.0.1",
+      NODE_ENV: "test",
+      PORT: "3001",
+      RENDER_OUTPUT_DIR: ".local-renders"
+    })
+  );
+
+  t.after(async () => {
+    await app.close();
+  });
+
+  const rejected = await app.inject({
+    method: "POST",
+    url: "/webhooks/max/march8-max",
+    payload: {
+      update_type: "bot_started",
+      chat_id: 777,
+      user: {
+        user_id: 777,
+        name: "Max User"
+      }
+    }
+  });
+
+  assert.equal(rejected.statusCode, 200);
+  assert.deepEqual(rejected.json(), { ok: false, error: "invalid_secret" });
+
+  const accepted = await app.inject({
+    method: "POST",
+    url: "/webhooks/max/march8-max",
+    headers: {
+      "x-max-bot-api-secret": "top-secret"
+    },
+    payload: {
+      update_type: "bot_started",
+      chat_id: 777,
+      user: {
+        user_id: 777,
+        name: "Max User"
+      }
+    }
+  });
+
+  assert.equal(accepted.statusCode, 200);
+  assert.deepEqual(accepted.json(), { ok: true });
+});

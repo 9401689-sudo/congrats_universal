@@ -13,7 +13,8 @@
     "build": "tsc -p tsconfig.json",
     "check": "tsc --noEmit -p tsconfig.json",
     "test": "node --import tsx --test tests/**/*.test.ts",
-    "make:campaign": "tsx scripts/make-campaign.ts"
+    "make:campaign": "tsx scripts/make-campaign.ts",
+    "max:subscribe": "tsx scripts/register-max-webhook.ts"
   },
   "dependencies": {
     "fastify": "^5.2.1",

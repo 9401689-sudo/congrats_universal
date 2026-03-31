@@ -36,7 +36,7 @@ export function routeTelegramEvent(
     }
   }
 
-  if (event.eventType === "text" && event.isStart) {
+  if (event.isStart) {
     return { kind: "start_intro" };
   }
 

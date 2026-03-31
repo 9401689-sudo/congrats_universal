@@ -33,6 +33,7 @@ import { InMemoryPaymentsRepository } from "../../adapters/payments/in-memory-pa
 import { PostgresPaymentsRepository } from "../../adapters/payments/postgres-payments-repository.js";
 import { YookassaPaymentService } from "../../adapters/payments/yookassa-payment-service.js";
 import { LoggingChannelGateway } from "../../adapters/channel/logging-channel-gateway.js";
+import { MaxApiChannelGateway } from "../../adapters/max/max-api-channel-gateway.js";
 import { InMemoryRequestsRepository } from "../../adapters/requests/in-memory-requests-repository.js";
 import { PostgresRequestsRepository } from "../../adapters/requests/postgres-requests-repository.js";
 import { createSessionStore } from "../../adapters/session/create-session-store.js";
@@ -48,6 +49,7 @@ export type ApplicationContext = {
     campaignId: string;
     channel: "max" | "telegram";
     id: string;
+    webhookSecret?: string;
   };
   configSummary: {
     hasDatabase: boolean;
@@ -102,7 +104,9 @@ export function createApplicationContext(
       ? botToken
         ? new BotApiTelegramGateway(botToken)
         : new LoggingTelegramGateway(logger)
-      : new LoggingChannelGateway(logger, "max");
+      : botToken
+        ? new MaxApiChannelGateway(botToken)
+        : new LoggingChannelGateway(logger, "max");
   const deliveryTransport =
     runtime.channel === "telegram" && botToken
     ? new BotApiDeliveryTransport(botToken)
@@ -145,7 +149,8 @@ export function createApplicationContext(
     botRuntime: {
       campaignId: runtime.campaignId,
       channel: runtime.channel,
-      id: runtime.id
+      id: runtime.id,
+      webhookSecret: runtime.webhookSecret
     },
     configSummary: {
       hasDatabase: Boolean(config.databaseUrl),

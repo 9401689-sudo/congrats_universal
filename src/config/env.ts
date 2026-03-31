@@ -7,6 +7,7 @@ const botRuntimeSchema = z.object({
   channel: z.enum(["telegram", "max"]).default("telegram"),
   id: z.string().min(1),
   telegramBotToken: z.string().min(1).optional(),
+  webhookSecret: z.string().min(1).optional(),
   yookassaReturnUrl: z.string().url().optional(),
   yookassaSecretKey: z.string().min(1).optional(),
   yookassaShopId: z.string().min(1).optional()
