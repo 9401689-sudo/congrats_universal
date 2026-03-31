@@ -52,7 +52,7 @@ async function main(): Promise<void> {
   const response = await fetch("https://platform-api.max.ru/subscriptions", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${botToken}`,
+      Authorization: botToken,
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
