@@ -113,6 +113,7 @@ export class TelegramApplicationService {
           await this.telegramGateway.sendMessage({
             chatId: effect.chatId,
             preserveInlineKeyboard: effect.text === currentCampaignTexts.prompts.buttonsOnly,
+            replyMarkup: effect.replyMarkup,
             text: effect.text
           });
           break;

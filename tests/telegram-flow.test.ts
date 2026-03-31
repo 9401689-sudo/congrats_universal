@@ -1253,6 +1253,10 @@ test("/about returns bureau description instead of buttons-only hint", async () 
   );
 
   assert.match(telegramGateway.messages.at(-1)?.text ?? "", /Официальная инстанция/);
+  assert.equal(
+    telegramGateway.messages.at(-1)?.replyMarkup?.inline_keyboard[0]?.[0]?.callback_data,
+    "START_NEW"
+  );
 });
 
 test("start performs best-effort chat cleanup", async () => {

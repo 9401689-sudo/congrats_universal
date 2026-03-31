@@ -1,10 +1,11 @@
 import type { NormalizedTelegramEvent } from "../../domain/events.js";
 import type { BotSession } from "../../domain/session.js";
 import { currentCampaignTexts } from "../../campaigns/active-campaign.js";
+import type { ChannelReplyMarkup } from "../channel/channel-gateway.js";
 import { routeTelegramEvent } from "./telegram-router.js";
 
 export type BotEffect =
-  | { type: "send_message"; chatId: string; text: string }
+  | { type: "send_message"; chatId: string; replyMarkup?: ChannelReplyMarkup; text: string }
   | { type: "start_workflow"; workflow: string; payload: Record<string, unknown> }
   | { type: "persist_delivery_username"; requestId: string; username: string }
   | { type: "persist_email"; email: string }
@@ -27,6 +28,7 @@ export function handleBotEvent(
         {
           type: "send_message",
           chatId: event.chatId ?? session.chatId ?? session.tgUserId,
+          replyMarkup: buildAboutReplyMarkup(session),
           text: currentCampaignTexts.prompts.aboutBureau
         }
       ],
@@ -209,6 +211,21 @@ export function handleBotEvent(
         session: baseSession
       };
   }
+}
+
+function buildAboutReplyMarkup(session: BotSession): ChannelReplyMarkup {
+  if (session.activeRequestId) {
+    return {
+      inline_keyboard: [
+        [{ text: currentCampaignTexts.buttons.continueCurrentRequest, callback_data: "START_CONTINUE" }],
+        [{ text: currentCampaignTexts.buttons.restart, callback_data: "START_FORCE_NEW" }]
+      ]
+    };
+  }
+
+  return {
+    inline_keyboard: [[{ text: "Начать", callback_data: "START_NEW" }]]
+  };
 }
 
 function startWorkflow(
