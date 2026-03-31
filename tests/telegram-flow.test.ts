@@ -1227,6 +1227,34 @@ test("unexpected text outside input states tells user to use buttons", async () 
   assert.equal(telegramGateway.messages.at(-1)?.text, "Сейчас управление осуществляется кнопками.");
 });
 
+test("/about returns bureau description instead of buttons-only hint", async () => {
+  const sessionStore = new InMemorySessionStore();
+  const telegramGateway = new CapturingTelegramGateway();
+  const service = new TelegramApplicationService(
+    new InMemoryUsersRepository(),
+    new InMemoryRequestsRepository(),
+    sessionStore,
+    telegramGateway,
+    new InMemoryVariantsRepository(),
+    new FakePaymentService(),
+    new InMemoryPaymentsRepository()
+  );
+
+  await service.processEvent(
+    normalizeTelegramUpdate({
+      message: {
+        chat: { id: 101, type: "private" },
+        from: { first_name: "Ivan", id: 101, username: "ivan" },
+        message_id: 1,
+        text: "/about"
+      },
+      update_id: 1
+    })
+  );
+
+  assert.match(telegramGateway.messages.at(-1)?.text ?? "", /Официальная инстанция/);
+});
+
 test("start performs best-effort chat cleanup", async () => {
   const sessionStore = new InMemorySessionStore();
   const telegramGateway = new CapturingTelegramGateway();

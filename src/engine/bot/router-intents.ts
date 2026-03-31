@@ -2,6 +2,7 @@ import type { Tariff } from "../../domain/session.js";
 
 export type RouterIntent =
   | { kind: "ignore"; reason: string }
+  | { kind: "about_bureau" }
   | { kind: "start_intro" }
   | { kind: "start_new" }
   | { kind: "start_force_new" }

@@ -43,6 +43,10 @@ export function routeTelegramEvent(
   if (event.eventType === "text" && event.text) {
     const text = event.text.trim();
 
+    if (text === "/about" || text.startsWith("/about@")) {
+      return { kind: "about_bureau" };
+    }
+
     if (session.awaiting === "recipient_name" && text) {
       return { kind: "recipient_name_received", recipientName: text };
     }

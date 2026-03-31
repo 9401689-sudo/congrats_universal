@@ -81,6 +81,12 @@ npm run max:subscribe -- --bot-id max-main --url https://bot2.doorsvip.ru/webhoo
 
 If you set `webhookSecret` in the runtime, the server will require `X-Max-Bot-Api-Secret` on incoming MAX webhook calls.
 
+To register the MAX bot menu command `О Бюро`:
+
+```bash
+npm run max:set-commands -- --bot-id max-main
+```
+
 ## Notes
 
 - If `DATABASE_URL` or `REDIS_URL` are missing, the app falls back to in-memory repositories for many flows.

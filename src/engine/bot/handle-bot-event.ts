@@ -19,6 +19,30 @@ export function handleBotEvent(
   session: BotSession,
   event: NormalizedTelegramEvent
 ): BotHandlerResult {
+  const routed = routeTelegramEvent(session, event);
+
+  if (routed.kind === "about_bureau") {
+    return {
+      effects: [
+        {
+          type: "send_message",
+          chatId: event.chatId ?? session.chatId ?? session.tgUserId,
+          text: currentCampaignTexts.prompts.aboutBureau
+        }
+      ],
+      session: {
+        ...session,
+        chatId: event.chatId ?? session.chatId,
+        chatType: event.chatType ?? session.chatType,
+        lastEventType: event.eventType,
+        lastUpdateId: event.updateId,
+        tgFirstName: event.tgFirstName ?? session.tgFirstName,
+        tgLastName: event.tgLastName ?? session.tgLastName,
+        tgUsername: event.tgUsername ?? session.tgUsername
+      }
+    };
+  }
+
   if (
     event.eventType === "text" &&
     !event.isStart &&
@@ -45,7 +69,6 @@ export function handleBotEvent(
     };
   }
 
-  const routed = routeTelegramEvent(session, event);
   const baseSession: BotSession = {
     ...session,
     chatId: event.chatId ?? session.chatId,

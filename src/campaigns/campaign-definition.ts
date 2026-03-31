@@ -58,6 +58,7 @@ export type CampaignTexts = {
     timezoneValue: (timezone: string) => string;
   };
   prompts: {
+    aboutBureau: string;
     buttonsOnly: string;
     chooseAction: string;
     chooseDeliveryMethod: string;

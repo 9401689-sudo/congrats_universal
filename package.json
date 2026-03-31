@@ -14,9 +14,11 @@
     "check": "tsc --noEmit -p tsconfig.json",
     "test": "node --import tsx --test tests/**/*.test.ts",
     "make:campaign": "tsx scripts/make-campaign.ts",
-    "max:subscribe": "tsx scripts/register-max-webhook.ts"
+    "max:subscribe": "tsx scripts/register-max-webhook.ts",
+    "max:set-commands": "tsx scripts/register-max-commands.ts"
   },
   "dependencies": {
+    "@maxhub/max-bot-api": "^0.2.2",
     "fastify": "^5.2.1",
     "ioredis": "^5.10.1",
     "pg": "^8.20.0",
