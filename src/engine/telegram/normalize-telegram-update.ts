@@ -69,6 +69,7 @@ export function normalizeTelegramUpdate(input: unknown): NormalizedTelegramEvent
     callbackMessageId:
       callback?.message?.message_id != null ? String(callback.message.message_id) : null,
     callbackQueryId: callback?.id ? String(callback.id) : null,
+    channel: "telegram",
     chatId: chat?.id != null ? String(chat.id) : null,
     chatType: chat?.type ? String(chat.type) : null,
     currency:
@@ -95,6 +96,10 @@ export function normalizeTelegramUpdate(input: unknown): NormalizedTelegramEvent
     tgLastName: from?.last_name ? String(from.last_name) : null,
     tgUserId: from?.id != null ? String(from.id) : null,
     tgUsername: from?.username ? String(from.username) : null,
+    userFirstName: from?.first_name ? String(from.first_name) : null,
+    userLastName: from?.last_name ? String(from.last_name) : null,
+    userId: from?.id != null ? String(from.id) : null,
+    username: from?.username ? String(from.username) : null,
     totalAmount:
       typeof (preCheckout?.total_amount ?? successfulPayment?.total_amount) === "number"
         ? Number(preCheckout?.total_amount ?? successfulPayment?.total_amount)

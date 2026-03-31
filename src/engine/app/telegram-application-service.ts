@@ -1,4 +1,4 @@
-import type { NormalizedTelegramEvent } from "../../domain/events.js";
+import type { NormalizedChannelEvent } from "../../domain/events.js";
 import { createEmptySession, type BotSession } from "../../domain/session.js";
 import {
   campaignTimezoneKeyboard,
@@ -35,13 +35,13 @@ export class TelegramApplicationService {
     private readonly previewRenderer?: PreviewRenderer
   ) {}
 
-  async processEvent(event: NormalizedTelegramEvent): Promise<BotSession | null> {
-    if (!event.tgUserId) {
+  async processEvent(event: NormalizedChannelEvent): Promise<BotSession | null> {
+    if (!event.userId) {
       return null;
     }
 
     const currentSession =
-      (await this.sessionStore.get(event.tgUserId)) ?? createEmptySession(event.tgUserId);
+      (await this.sessionStore.get(event.userId)) ?? createEmptySession(event.userId);
 
     if (event.isStart) {
       this.kickOffChatCleanup(currentSession, event);
@@ -119,7 +119,7 @@ export class TelegramApplicationService {
 
   private async applyWorkflowEffect(
     session: BotSession,
-    event: NormalizedTelegramEvent,
+    event: NormalizedChannelEvent,
     workflow: string,
     payload: Record<string, unknown>
   ): Promise<BotSession> {
@@ -729,7 +729,7 @@ export class TelegramApplicationService {
 
   private async cleanupChatOnStart(
     _session: BotSession,
-    event: NormalizedTelegramEvent
+    event: NormalizedChannelEvent
   ): Promise<void> {
     const chatId = event.chatId;
     const messageId = event.messageId;
@@ -779,7 +779,7 @@ export class TelegramApplicationService {
     }
   }
 
-  private kickOffChatCleanup(session: BotSession, event: NormalizedTelegramEvent): void {
+  private kickOffChatCleanup(session: BotSession, event: NormalizedChannelEvent): void {
     void this.cleanupChatOnStart(session, event).catch(() => {});
   }
 }
