@@ -127,8 +127,8 @@ export class MaxApiChannelGateway implements ChannelGateway {
     return await this.expectJson<MaxUploadedMediaPayload>(uploadResponse, "MAX uploadMedia");
   }
 
-  private buildMessagesUrl(chatId: string): string {
-    return `${this.apiBaseUrl}/messages?chat_id=${encodeURIComponent(chatId)}`;
+  private buildMessagesUrl(userId: string): string {
+    return `${this.apiBaseUrl}/messages?user_id=${encodeURIComponent(userId)}`;
   }
 
   private buildKeyboardAttachments(replyMarkup?: ChannelReplyMarkup): Array<Record<string, unknown>> {
