@@ -1259,6 +1259,61 @@ test("/about returns bureau description instead of buttons-only hint", async () 
   );
 });
 
+test("/about ignores active request and still shows a single start button", async () => {
+  const sessionStore = new InMemorySessionStore();
+  const telegramGateway = new CapturingTelegramGateway();
+  const service = new TelegramApplicationService(
+    new InMemoryUsersRepository(),
+    new InMemoryRequestsRepository(),
+    sessionStore,
+    telegramGateway,
+    new InMemoryVariantsRepository(),
+    new FakePaymentService(),
+    new InMemoryPaymentsRepository()
+  );
+
+  await sessionStore.set({
+    activeRequestId: "555",
+    awaiting: "none",
+    chatId: "101",
+    chatType: "private",
+    currentVariantIdx: 1,
+    customerEmail: null,
+    customerEmailRequestId: null,
+    deliveryMethodRequestId: null,
+    initiatorTimezone: null,
+    lastCallbackData: null,
+    lastBotMessageIds: [],
+    lastEventType: null,
+    lastInlineMessageId: null,
+    lastUpdateId: null,
+    lastVariantIdx: 1,
+    recipientName: "Мария",
+    tariffPending: null,
+    tgFirstName: "Ivan",
+    tgLastName: null,
+    tgUserId: "101",
+    tgUsername: "ivan",
+    tzReturnTo: null
+  });
+
+  await service.processEvent(
+    normalizeTelegramUpdate({
+      message: {
+        chat: { id: 101, type: "private" },
+        from: { first_name: "Ivan", id: 101, username: "ivan" },
+        message_id: 2,
+        text: "/about"
+      },
+      update_id: 2
+    })
+  );
+
+  const lastMessage = telegramGateway.messages.at(-1);
+  assert.equal(lastMessage?.replyMarkup?.inline_keyboard.length, 1);
+  assert.equal(lastMessage?.replyMarkup?.inline_keyboard[0]?.[0]?.callback_data, "START_NEW");
+});
+
 test("start performs best-effort chat cleanup", async () => {
   const sessionStore = new InMemorySessionStore();
   const telegramGateway = new CapturingTelegramGateway();

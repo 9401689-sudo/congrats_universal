@@ -28,7 +28,7 @@ export function handleBotEvent(
         {
           type: "send_message",
           chatId: event.chatId ?? session.chatId ?? session.tgUserId,
-          replyMarkup: buildAboutReplyMarkup(session),
+          replyMarkup: buildAboutReplyMarkup(),
           text: currentCampaignTexts.prompts.aboutBureau
         }
       ],
@@ -213,16 +213,7 @@ export function handleBotEvent(
   }
 }
 
-function buildAboutReplyMarkup(session: BotSession): ChannelReplyMarkup {
-  if (session.activeRequestId) {
-    return {
-      inline_keyboard: [
-        [{ text: currentCampaignTexts.buttons.continueCurrentRequest, callback_data: "START_CONTINUE" }],
-        [{ text: currentCampaignTexts.buttons.restart, callback_data: "START_FORCE_NEW" }]
-      ]
-    };
-  }
-
+function buildAboutReplyMarkup(): ChannelReplyMarkup {
   return {
     inline_keyboard: [[{ text: "Начать", callback_data: "START_NEW" }]]
   };
