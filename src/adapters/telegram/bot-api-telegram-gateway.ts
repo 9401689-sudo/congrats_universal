@@ -14,6 +14,7 @@ export class BotApiTelegramGateway implements TelegramGateway {
     chatId: string;
     preserveInlineKeyboard?: boolean;
     text: string;
+    stickyInlineKeyboard?: boolean;
     replyMarkup?: {
       inline_keyboard: Array<Array<{ callback_data?: string; text: string; url?: string }>>;
     };

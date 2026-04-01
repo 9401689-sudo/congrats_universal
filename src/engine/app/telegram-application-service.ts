@@ -32,7 +32,8 @@ export class TelegramApplicationService {
     private readonly variantsRepository: VariantsRepository,
     private readonly paymentService: PaymentService,
     private readonly paymentsRepository: PaymentsRepository,
-    private readonly previewRenderer?: PreviewRenderer
+    private readonly previewRenderer?: PreviewRenderer,
+    private readonly channel: "telegram" | "max" = "telegram"
   ) {}
 
   async processEvent(event: NormalizedChannelEvent): Promise<BotSession | null> {
@@ -113,6 +114,9 @@ export class TelegramApplicationService {
           await this.telegramGateway.sendMessage({
             chatId: effect.chatId,
             preserveInlineKeyboard: effect.text === currentCampaignTexts.prompts.buttonsOnly,
+            stickyInlineKeyboard:
+              this.channel === "max" &&
+              effect.text === currentCampaignTexts.prompts.aboutBureau,
             replyMarkup: effect.replyMarkup,
             text: effect.text
           });
@@ -136,6 +140,7 @@ export class TelegramApplicationService {
       case "2_START_INTRO":
         await this.telegramGateway.sendMessage({
           chatId: event.chatId ?? session.chatId ?? session.tgUserId,
+          stickyInlineKeyboard: this.channel === "max",
           text: currentCampaignTexts.prompts.aboutBureau,
           replyMarkup: session.activeRequestId
             ? {

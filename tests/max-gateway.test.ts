@@ -94,6 +94,75 @@ test("MAX sendMessage clears previous inline keyboard before sending a new one",
   assert.equal(calls[2]?.init?.method, "POST");
 });
 
+test("MAX sticky welcome message is replaced only by the next sticky welcome", async () => {
+  const calls: Array<{ url: string; init?: RequestInit }> = [];
+  const originalFetch = globalThis.fetch;
+
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    const url = String(input);
+    calls.push({ init, url });
+
+    if (init?.method === "DELETE" || init?.method === "PUT") {
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
+    if (init?.method === "POST") {
+      const postCount = calls.filter((call) => call.init?.method === "POST").length;
+      return new Response(
+        JSON.stringify({ message: { message_id: `m${postCount}` } }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        }
+      );
+    }
+
+    throw new Error(`Unexpected fetch call: ${url}`);
+  }) as typeof fetch;
+
+  try {
+    const gateway = new MaxApiChannelGateway("max-token");
+    await gateway.sendMessage({
+      chatId: "777",
+      stickyInlineKeyboard: true,
+      replyMarkup: {
+        inline_keyboard: [[{ text: "Start", callback_data: "START_NEW" }]]
+      },
+      text: "welcome"
+    });
+
+    await gateway.sendMessage({
+      chatId: "777",
+      replyMarkup: {
+        inline_keyboard: [[{ text: "Flow", callback_data: "FLOW" }]]
+      },
+      text: "flow"
+    });
+
+    await gateway.sendMessage({
+      chatId: "777",
+      stickyInlineKeyboard: true,
+      replyMarkup: {
+        inline_keyboard: [[{ text: "Start 2", callback_data: "START_NEW" }]]
+      },
+      text: "welcome 2"
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  assert.equal(calls[0]?.init?.method, "POST");
+  assert.equal(calls[1]?.init?.method, "POST");
+  assert.equal(calls[2]?.init?.method, "DELETE");
+  assert.equal(calls[2]?.url, "https://platform-api.max.ru/messages?message_id=m1");
+  assert.equal(calls[3]?.init?.method, "PUT");
+  assert.equal(calls[3]?.url, "https://platform-api.max.ru/messages?message_id=m2");
+  assert.equal(calls[4]?.init?.method, "POST");
+});
+
 test("MAX delivery transport uploads rendered file and sends file attachment", async () => {
   const tempDir = await mkdtemp(path.join(os.tmpdir(), "max-delivery-"));
   const renderedPath = path.join(tempDir, "document.png");

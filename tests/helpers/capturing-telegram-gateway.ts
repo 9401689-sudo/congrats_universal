@@ -7,6 +7,7 @@ export type SentTelegramMessage = {
   replyMarkup?: {
     inline_keyboard: Array<Array<{ callback_data?: string; text: string; url?: string }>>;
   };
+  stickyInlineKeyboard?: boolean;
   text: string;
 };
 

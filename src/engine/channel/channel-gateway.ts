@@ -12,6 +12,7 @@ export type SendChannelMessageInput = {
   chatId: string;
   preserveInlineKeyboard?: boolean;
   replyMarkup?: ChannelReplyMarkup;
+  stickyInlineKeyboard?: boolean;
   text: string;
 };
 

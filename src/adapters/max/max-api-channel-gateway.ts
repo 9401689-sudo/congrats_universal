@@ -27,6 +27,7 @@ type MaxUploadedMediaPayload = Record<string, unknown> & {
 export class MaxApiChannelGateway implements ChannelGateway {
   private readonly apiBaseUrl = "https://platform-api.max.ru";
   private readonly lastInlineMessageIdByChat = new Map<string, string>();
+  private readonly stickyInlineMessageIdByChat = new Map<string, string>();
   private readonly token: string;
 
   constructor(botToken: string) {
@@ -34,6 +35,10 @@ export class MaxApiChannelGateway implements ChannelGateway {
   }
 
   async sendMessage(input: SendChannelMessageInput): Promise<string | null> {
+    if (input.stickyInlineKeyboard) {
+      await this.deletePreviousStickyInlineMessage(input.chatId);
+    }
+
     if (!input.preserveInlineKeyboard) {
       await this.clearPreviousInlineKeyboard(input.chatId);
     }
@@ -51,7 +56,12 @@ export class MaxApiChannelGateway implements ChannelGateway {
 
     const payload = await this.expectJson<MaxMessageResponse>(response, "MAX sendMessage");
     const messageId = payload.message?.body?.mid ?? payload.message?.message_id ?? null;
-    this.rememberInlineMessage(input.chatId, messageId, Boolean(input.replyMarkup));
+    this.rememberInlineMessage(
+      input.chatId,
+      messageId,
+      Boolean(input.replyMarkup),
+      Boolean(input.stickyInlineKeyboard)
+    );
     return messageId;
   }
 
@@ -77,7 +87,7 @@ export class MaxApiChannelGateway implements ChannelGateway {
 
     const payload = await this.expectJson<MaxMessageResponse>(response, "MAX sendPhoto");
     const messageId = payload.message?.body?.mid ?? payload.message?.message_id ?? null;
-    this.rememberInlineMessage(input.chatId, messageId, Boolean(input.replyMarkup));
+    this.rememberInlineMessage(input.chatId, messageId, Boolean(input.replyMarkup), false);
     return messageId;
   }
 
@@ -98,6 +108,11 @@ export class MaxApiChannelGateway implements ChannelGateway {
     const tracked = this.lastInlineMessageIdByChat.get(_input.chatId);
     if (tracked === _input.messageId) {
       this.lastInlineMessageIdByChat.delete(_input.chatId);
+    }
+
+    const stickyTracked = this.stickyInlineMessageIdByChat.get(_input.chatId);
+    if (stickyTracked === _input.messageId) {
+      this.stickyInlineMessageIdByChat.delete(_input.chatId);
     }
   }
 
@@ -120,6 +135,11 @@ export class MaxApiChannelGateway implements ChannelGateway {
     const tracked = this.lastInlineMessageIdByChat.get(input.chatId);
     if (tracked === input.messageId) {
       this.lastInlineMessageIdByChat.delete(input.chatId);
+    }
+
+    const stickyTracked = this.stickyInlineMessageIdByChat.get(input.chatId);
+    if (stickyTracked === input.messageId) {
+      this.stickyInlineMessageIdByChat.delete(input.chatId);
     }
   }
 
@@ -224,17 +244,36 @@ export class MaxApiChannelGateway implements ChannelGateway {
   private rememberInlineMessage(
     chatId: string,
     messageId: string | null,
-    hasInlineKeyboard: boolean
+    hasInlineKeyboard: boolean,
+    isSticky: boolean
   ): void {
     if (!messageId) {
       return;
     }
 
     if (hasInlineKeyboard) {
+      if (isSticky) {
+        this.stickyInlineMessageIdByChat.set(chatId, messageId);
+        return;
+      }
+
       this.lastInlineMessageIdByChat.set(chatId, messageId);
       return;
     }
 
     this.lastInlineMessageIdByChat.delete(chatId);
+  }
+
+  private async deletePreviousStickyInlineMessage(chatId: string): Promise<void> {
+    const previousMessageId = this.stickyInlineMessageIdByChat.get(chatId);
+    if (!previousMessageId) {
+      return;
+    }
+
+    try {
+      await this.deleteMessage({ chatId, messageId: previousMessageId });
+    } catch {
+      this.stickyInlineMessageIdByChat.delete(chatId);
+    }
   }
 }

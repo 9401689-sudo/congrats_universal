@@ -42,7 +42,8 @@ export function registerMaxWebhook(app: FastifyInstance): void {
       context.variantsRepository,
       context.paymentService,
       context.paymentsRepository,
-      context.previewRenderer
+      context.previewRenderer,
+      "max"
     );
     const nextSession = await service.processEvent(event);
 

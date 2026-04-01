@@ -29,7 +29,8 @@ export function registerTelegramWebhook(app: FastifyInstance): void {
       context.variantsRepository,
       context.paymentService,
       context.paymentsRepository,
-      context.previewRenderer
+      context.previewRenderer,
+      "telegram"
     );
     const nextSession = await service.processEvent(event);
 
