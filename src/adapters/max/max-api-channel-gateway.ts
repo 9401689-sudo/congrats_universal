@@ -72,8 +72,18 @@ export class MaxApiChannelGateway implements ChannelGateway {
   }
 
   async clearInlineKeyboard(_input: { chatId: string; messageId: string }): Promise<void> {
-    // MAX supports message editing, but our current engine does not keep enough original
-    // message body state to safely rebuild non-keyboard attachments during edit.
+    const response = await fetch(
+      `${this.apiBaseUrl}/messages?message_id=${encodeURIComponent(_input.messageId)}`,
+      {
+        method: "PUT",
+        headers: this.jsonHeaders(),
+        body: JSON.stringify({
+          attachments: []
+        })
+      }
+    );
+
+    await this.expectJson<Record<string, unknown>>(response, "MAX clearInlineKeyboard");
   }
 
   async deleteMessage(input: { chatId: string; messageId: string }): Promise<void> {

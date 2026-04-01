@@ -26,6 +26,7 @@ import { FakeRenderingAdapter } from "../../adapters/deliveries/fake-rendering-a
 import { InMemoryDeliveriesRepository } from "../../adapters/deliveries/in-memory-deliveries-repository.js";
 import { LocalFileRenderingAdapter } from "../../adapters/deliveries/local-file-rendering-adapter.js";
 import { LoggingDeliveryTransport } from "../../adapters/deliveries/logging-delivery-transport.js";
+import { MaxDeliveryTransport } from "../../adapters/deliveries/max-delivery-transport.js";
 import { PostgresDeliveriesRepository } from "../../adapters/deliveries/postgres-deliveries-repository.js";
 import { PythonRenderDocAdapter } from "../../adapters/deliveries/python-render-doc-adapter.js";
 import { FakePaymentService } from "../../adapters/payments/fake-payment-service.js";
@@ -109,8 +110,10 @@ export function createApplicationContext(
         : new LoggingChannelGateway(logger, "max");
   const deliveryTransport =
     runtime.channel === "telegram" && botToken
-    ? new BotApiDeliveryTransport(botToken)
-    : new LoggingDeliveryTransport(logger);
+      ? new BotApiDeliveryTransport(botToken)
+      : runtime.channel === "max" && botToken
+        ? new MaxDeliveryTransport(botToken)
+        : new LoggingDeliveryTransport(logger);
   const pythonRendererWorkerClient =
     config.pythonRendererBin && config.pythonRendererScriptPath
       ? new PythonRendererWorkerClient({
