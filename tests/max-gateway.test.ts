@@ -37,6 +37,63 @@ test("MAX clearInlineKeyboard edits message and removes attachments", async () =
   assert.equal(calls[0]?.init?.body, JSON.stringify({ attachments: [] }));
 });
 
+test("MAX sendMessage clears previous inline keyboard before sending a new one", async () => {
+  const calls: Array<{ url: string; init?: RequestInit }> = [];
+  const originalFetch = globalThis.fetch;
+
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    const url = String(input);
+    calls.push({ init, url });
+
+    if (init?.method === "PUT") {
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
+    if (init?.method === "POST") {
+      const postCount = calls.filter((call) => call.init?.method === "POST").length;
+      return new Response(
+        JSON.stringify({ message: { message_id: postCount === 1 ? "m1" : "m2" } }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        }
+      );
+    }
+
+    throw new Error(`Unexpected fetch call: ${url}`);
+  }) as typeof fetch;
+
+  try {
+    const gateway = new MaxApiChannelGateway("max-token");
+    await gateway.sendMessage({
+      chatId: "777",
+      replyMarkup: {
+        inline_keyboard: [[{ text: "One", callback_data: "ONE" }]]
+      },
+      text: "first"
+    });
+
+    await gateway.sendMessage({
+      chatId: "777",
+      replyMarkup: {
+        inline_keyboard: [[{ text: "Two", callback_data: "TWO" }]]
+      },
+      text: "second"
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  assert.equal(calls.length, 3);
+  assert.equal(calls[0]?.init?.method, "POST");
+  assert.equal(calls[1]?.init?.method, "PUT");
+  assert.equal(calls[1]?.url, "https://platform-api.max.ru/messages?message_id=m1");
+  assert.equal(calls[2]?.init?.method, "POST");
+});
+
 test("MAX delivery transport uploads rendered file and sends file attachment", async () => {
   const tempDir = await mkdtemp(path.join(os.tmpdir(), "max-delivery-"));
   const renderedPath = path.join(tempDir, "document.png");

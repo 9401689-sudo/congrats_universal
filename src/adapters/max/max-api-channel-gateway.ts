@@ -26,6 +26,7 @@ type MaxUploadedMediaPayload = Record<string, unknown> & {
 
 export class MaxApiChannelGateway implements ChannelGateway {
   private readonly apiBaseUrl = "https://platform-api.max.ru";
+  private readonly lastInlineMessageIdByChat = new Map<string, string>();
   private readonly token: string;
 
   constructor(botToken: string) {
@@ -33,6 +34,10 @@ export class MaxApiChannelGateway implements ChannelGateway {
   }
 
   async sendMessage(input: SendChannelMessageInput): Promise<string | null> {
+    if (!input.preserveInlineKeyboard) {
+      await this.clearPreviousInlineKeyboard(input.chatId);
+    }
+
     const body = {
       text: input.text,
       attachments: this.buildKeyboardAttachments(input.replyMarkup)
@@ -45,10 +50,13 @@ export class MaxApiChannelGateway implements ChannelGateway {
     });
 
     const payload = await this.expectJson<MaxMessageResponse>(response, "MAX sendMessage");
-    return payload.message?.body?.mid ?? payload.message?.message_id ?? null;
+    const messageId = payload.message?.body?.mid ?? payload.message?.message_id ?? null;
+    this.rememberInlineMessage(input.chatId, messageId, Boolean(input.replyMarkup));
+    return messageId;
   }
 
   async sendPhoto(input: SendChannelPhotoInput): Promise<string | null> {
+    await this.clearPreviousInlineKeyboard(input.chatId);
     const imagePayload = await this.uploadMedia(input.photoPath, "image");
     const attachments = [
       {
@@ -68,7 +76,9 @@ export class MaxApiChannelGateway implements ChannelGateway {
     });
 
     const payload = await this.expectJson<MaxMessageResponse>(response, "MAX sendPhoto");
-    return payload.message?.body?.mid ?? payload.message?.message_id ?? null;
+    const messageId = payload.message?.body?.mid ?? payload.message?.message_id ?? null;
+    this.rememberInlineMessage(input.chatId, messageId, Boolean(input.replyMarkup));
+    return messageId;
   }
 
   async clearInlineKeyboard(_input: { chatId: string; messageId: string }): Promise<void> {
@@ -84,6 +94,11 @@ export class MaxApiChannelGateway implements ChannelGateway {
     );
 
     await this.expectJson<Record<string, unknown>>(response, "MAX clearInlineKeyboard");
+
+    const tracked = this.lastInlineMessageIdByChat.get(_input.chatId);
+    if (tracked === _input.messageId) {
+      this.lastInlineMessageIdByChat.delete(_input.chatId);
+    }
   }
 
   async deleteMessage(input: { chatId: string; messageId: string }): Promise<void> {
@@ -100,6 +115,11 @@ export class MaxApiChannelGateway implements ChannelGateway {
     if (!response.ok) {
       const body = await response.text();
       throw new Error(`MAX deleteMessage failed: ${response.status} ${body}`);
+    }
+
+    const tracked = this.lastInlineMessageIdByChat.get(input.chatId);
+    if (tracked === input.messageId) {
+      this.lastInlineMessageIdByChat.delete(input.chatId);
     }
   }
 
@@ -186,5 +206,35 @@ export class MaxApiChannelGateway implements ChannelGateway {
     }
 
     return (await response.json()) as T;
+  }
+
+  private async clearPreviousInlineKeyboard(chatId: string): Promise<void> {
+    const previousMessageId = this.lastInlineMessageIdByChat.get(chatId);
+    if (!previousMessageId) {
+      return;
+    }
+
+    try {
+      await this.clearInlineKeyboard({ chatId, messageId: previousMessageId });
+    } catch {
+      this.lastInlineMessageIdByChat.delete(chatId);
+    }
+  }
+
+  private rememberInlineMessage(
+    chatId: string,
+    messageId: string | null,
+    hasInlineKeyboard: boolean
+  ): void {
+    if (!messageId) {
+      return;
+    }
+
+    if (hasInlineKeyboard) {
+      this.lastInlineMessageIdByChat.set(chatId, messageId);
+      return;
+    }
+
+    this.lastInlineMessageIdByChat.delete(chatId);
   }
 }
