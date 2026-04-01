@@ -32,6 +32,7 @@ test("delivery worker renders, sends and marks delivery as sent", async () => {
         deliveryMethod: "manual",
         documentId: document.id,
         finalFileId: null,
+        recipientUsername: null,
         renderParams: { foo: "bar" },
         requestId: request.id,
         tgUserId: "101"
@@ -62,6 +63,7 @@ test("delivery worker renders, sends and marks delivery as sent", async () => {
     async sendDocument(input) {
       assert.equal(input.chatId, "101");
       assert.equal(input.fileId, "file_123");
+      assert.equal(input.recipientUsername, null);
       return { fileId: "file_123" };
     }
   };

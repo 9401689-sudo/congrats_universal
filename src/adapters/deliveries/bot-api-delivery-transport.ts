@@ -12,7 +12,10 @@ export class BotApiDeliveryTransport implements DeliveryTransport {
   async sendDocument(input: {
     caption: string;
     chatId: string;
+    deliveryMethod?: "manual" | "username";
     fileId?: string;
+    recipientUsername?: string | null;
+    replyMarkup?: { inline_keyboard: Array<Array<{ callback_data?: string; text: string; url?: string }>> };
     renderedPath?: string;
   }): Promise<{ fileId: string }> {
     const form = new FormData();
@@ -26,6 +29,25 @@ export class BotApiDeliveryTransport implements DeliveryTransport {
       form.set("document", blob, input.renderedPath.split(/[\\/]/).pop() ?? "document.bin");
     } else {
       throw new Error("BotApiDeliveryTransport requires fileId or renderedPath");
+    }
+
+    const replyMarkup =
+      input.replyMarkup ??
+      (input.deliveryMethod === "username" && input.recipientUsername
+        ? {
+            inline_keyboard: [
+              [
+                {
+                  text: "Открыть чат получателя",
+                  url: `https://t.me/${input.recipientUsername.replace(/^@/, "")}`
+                }
+              ]
+            ]
+          }
+        : undefined);
+
+    if (replyMarkup) {
+      form.set("reply_markup", JSON.stringify(replyMarkup));
     }
 
     const response = await fetch(

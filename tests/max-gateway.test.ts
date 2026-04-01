@@ -100,3 +100,49 @@ test("MAX delivery transport uploads rendered file and sends file attachment", a
   assert.equal(body.attachments[0]?.type, "file");
   assert.equal(body.attachments[0]?.payload?.token, "uploaded-token");
 });
+
+test("MAX delivery transport adds open-chat button for username delivery", async () => {
+  const calls: Array<{ url: string; init?: RequestInit }> = [];
+  const originalFetch = globalThis.fetch;
+
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    const url = String(input);
+    calls.push({ init, url });
+
+    if (url === "https://platform-api.max.ru/messages?user_id=777") {
+      return new Response(JSON.stringify({ message: { message_id: "m2" } }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
+    throw new Error(`Unexpected fetch URL: ${url}`);
+  }) as typeof fetch;
+
+  try {
+    const transport = new MaxDeliveryTransport("max-token");
+    await transport.sendDocument({
+      caption: "ready",
+      chatId: "777",
+      deliveryMethod: "username",
+      fileId: "existing-file",
+      recipientUsername: "@recipient_name"
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  const body = JSON.parse(String(calls[0]?.init?.body)) as {
+    attachments: Array<{ payload: unknown; type: string }>;
+  };
+  const keyboard = body.attachments[1] as {
+    payload: {
+      buttons: Array<Array<{ type: string; text: string; url?: string }>>;
+    };
+    type: string;
+  };
+
+  assert.equal(keyboard.type, "inline_keyboard");
+  assert.equal(keyboard.payload.buttons[0]?.[0]?.type, "link");
+  assert.equal(keyboard.payload.buttons[0]?.[0]?.url, "https://max.ru/recipient_name");
+});

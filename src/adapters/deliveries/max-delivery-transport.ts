@@ -1,3 +1,4 @@
+import type { ChannelReplyMarkup } from "../../engine/channel/channel-gateway.js";
 import { openAsBlob } from "node:fs";
 
 import type { DeliveryTransport } from "../../engine/delivery/delivery-transport.js";
@@ -27,7 +28,10 @@ export class MaxDeliveryTransport implements DeliveryTransport {
   async sendDocument(input: {
     caption: string;
     chatId: string;
+    deliveryMethod?: "manual" | "username";
     fileId?: string;
+    recipientUsername?: string | null;
+    replyMarkup?: ChannelReplyMarkup;
     renderedPath?: string;
   }): Promise<{ fileId: string }> {
     const attachmentPayload = input.renderedPath
@@ -52,7 +56,22 @@ export class MaxDeliveryTransport implements DeliveryTransport {
           {
             type: "file",
             payload: attachmentPayload
-          }
+          },
+          ...this.buildKeyboardAttachments(
+            input.replyMarkup ??
+              (input.deliveryMethod === "username" && input.recipientUsername
+                ? {
+                    inline_keyboard: [
+                      [
+                        {
+                          text: "Открыть чат получателя",
+                          url: `https://max.ru/${input.recipientUsername.replace(/^@/, "")}`
+                        }
+                      ]
+                    ]
+                  }
+                : undefined)
+          )
         ]
       })
     });
@@ -102,5 +121,36 @@ export class MaxDeliveryTransport implements DeliveryTransport {
     }
 
     return (await response.json()) as T;
+  }
+
+  private buildKeyboardAttachments(replyMarkup?: ChannelReplyMarkup): Array<Record<string, unknown>> {
+    if (!replyMarkup?.inline_keyboard?.length) {
+      return [];
+    }
+
+    return [
+      {
+        type: "inline_keyboard",
+        payload: {
+          buttons: replyMarkup.inline_keyboard.map((row) =>
+            row.map((button) => {
+              if (button.url) {
+                return {
+                  type: "link",
+                  text: button.text,
+                  url: button.url
+                };
+              }
+
+              return {
+                type: "callback",
+                text: button.text,
+                payload: button.callback_data ?? button.text
+              };
+            })
+          )
+        }
+      }
+    ];
   }
 }

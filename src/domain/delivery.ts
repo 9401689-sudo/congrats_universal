@@ -11,6 +11,7 @@ export type DeliveryContext = {
   deliveryMethod: "manual" | "username";
   documentId: string;
   finalFileId: string | null;
+  recipientUsername: string | null;
   renderParams: Record<string, unknown>;
   requestId: string;
   tgUserId: string;

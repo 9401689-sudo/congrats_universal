@@ -24,6 +24,7 @@ type DeliveryContextRow = {
   delivery_method: "manual" | "username";
   document_id: number | string;
   final_file_id?: string | null;
+  recipient_username?: string | null;
   render_params?: Record<string, unknown> | null;
   request_id: number | string;
   tg_user_id: number | string;
@@ -77,6 +78,7 @@ export class PostgresDeliveriesRepository implements DeliveriesRepository {
           d.id as delivery_id,
           d.delivery_method,
           d.document_id,
+          d.recipient_username,
           doc.request_id,
           doc.render_params,
           doc.final_file_id,
@@ -104,6 +106,7 @@ export class PostgresDeliveriesRepository implements DeliveriesRepository {
       deliveryMethod: row.delivery_method,
       documentId: String(row.document_id),
       finalFileId: row.final_file_id ?? null,
+      recipientUsername: row.recipient_username ?? null,
       renderParams: row.render_params ?? {},
       requestId: String(row.request_id),
       tgUserId: String(row.tg_user_id)

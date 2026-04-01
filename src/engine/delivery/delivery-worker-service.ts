@@ -45,7 +45,9 @@ export class DeliveryWorkerService {
       await this.deliveryTransport.sendDocument({
         caption: "Документ готов и направлен по расписанию.",
         chatId: context.tgUserId,
-        fileId
+        deliveryMethod: context.deliveryMethod,
+        fileId,
+        recipientUsername: context.recipientUsername
       });
 
       await this.deliveriesRepository.markSent(context.deliveryId);

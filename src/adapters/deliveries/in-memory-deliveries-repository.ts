@@ -33,6 +33,7 @@ export class InMemoryDeliveriesRepository implements DeliveriesRepository {
       deliveryMethod: delivery.deliveryMethod,
       documentId: delivery.documentId,
       finalFileId: null,
+      recipientUsername: delivery.recipientUsername,
       renderParams: {},
       requestId: "unknown",
       tgUserId: "0"
