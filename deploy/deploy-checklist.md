@@ -8,9 +8,8 @@
    - outbound access to Telegram and YooKassa
 2. Put project on server.
 3. Fill `.env` with real values.
-4. Ensure Postgres schema already exists.
-5. Ensure Redis is reachable.
-6. Prepare reverse proxy for `bot2.doorsvip.ru`.
+4. Put renderer templates/assets into `deploy/templates` so they are mounted into `/mnt/razresheno`.
+5. Prepare reverse proxy for `bot2.doorsvip.ru`.
 
 ## Recommended Parallel Setup
 
@@ -62,3 +61,14 @@ curl "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/getWebhookInfo"
 git pull
 docker compose -f deploy/docker-compose.server.yml up -d --build
 ```
+
+## Included Infra In Compose
+
+The server compose now includes:
+
+- PostgreSQL
+- Redis
+- app container
+- nginx reverse proxy
+
+No external `supabase_default` network is required anymore for the default self-contained deploy path.
