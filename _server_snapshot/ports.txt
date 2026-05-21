@@ -1,0 +1,38 @@
+Netid State  Recv-Q Send-Q Local Address:Port  Peer Address:PortProcess                                                                                                              
+udp   UNCONN 0      0         127.0.0.54:53         0.0.0.0:*    users:(("systemd-resolve",pid=766,fd=16)) uid:991 ino:8303 sk:1 cgroup:/system.slice/systemd-resolved.service <->   
+udp   UNCONN 0      0      127.0.0.53%lo:53         0.0.0.0:*    users:(("systemd-resolve",pid=766,fd=14)) uid:991 ino:8301 sk:2 cgroup:/system.slice/systemd-resolved.service <->   
+tcp   LISTEN 0      4096         0.0.0.0:3001       0.0.0.0:*    users:(("docker-proxy",pid=4423,fd=8)) ino:18611 sk:3 cgroup:/system.slice/docker.service <->                       
+tcp   LISTEN 0      4096         0.0.0.0:3000       0.0.0.0:*    users:(("docker-proxy",pid=3730,fd=8)) ino:15290 sk:4 cgroup:/system.slice/docker.service <->                       
+tcp   LISTEN 0      4096         0.0.0.0:6543       0.0.0.0:*    users:(("docker-proxy",pid=6847,fd=8)) ino:21931 sk:5 cgroup:/system.slice/docker.service <->                       
+tcp   LISTEN 0      4096         0.0.0.0:6379       0.0.0.0:*    users:(("docker-proxy",pid=2397,fd=8)) ino:12645 sk:6 cgroup:/system.slice/docker.service <->                       
+tcp   LISTEN 0      4096         0.0.0.0:8080       0.0.0.0:*    users:(("docker-proxy",pid=3667,fd=8)) ino:15227 sk:7 cgroup:/system.slice/docker.service <->                       
+tcp   LISTEN 0      4096         0.0.0.0:4000       0.0.0.0:*    users:(("docker-proxy",pid=4085,fd=8)) ino:17654 sk:8 cgroup:/system.slice/docker.service <->                       
+tcp   LISTEN 0      4096   127.0.0.53%lo:53         0.0.0.0:*    users:(("systemd-resolve",pid=766,fd=15)) uid:991 ino:8302 sk:9 cgroup:/system.slice/systemd-resolved.service <->   
+tcp   LISTEN 0      4096       127.0.0.1:3018       0.0.0.0:*    users:(("docker-proxy",pid=3836,fd=8)) ino:16147 sk:a cgroup:/system.slice/docker.service <->                       
+tcp   LISTEN 0      4096       127.0.0.1:3017       0.0.0.0:*    users:(("docker-proxy",pid=3966,fd=8)) ino:17584 sk:b cgroup:/system.slice/docker.service <->                       
+tcp   LISTEN 0      4096         0.0.0.0:8000       0.0.0.0:*    users:(("docker-proxy",pid=3999,fd=8)) ino:17337 sk:c cgroup:/system.slice/docker.service <->                       
+tcp   LISTEN 0      4096       127.0.0.1:18789      0.0.0.0:*    users:(("docker-proxy",pid=2694,fd=8)) ino:12919 sk:d cgroup:/system.slice/docker.service <->                       
+tcp   LISTEN 0      4096         0.0.0.0:9090       0.0.0.0:*    users:(("docker-proxy",pid=2992,fd=8)) ino:14401 sk:e cgroup:/system.slice/docker.service <->                       
+tcp   LISTEN 0      4096         0.0.0.0:443        0.0.0.0:*    users:(("docker-proxy",pid=3542,fd=8)) ino:15151 sk:f cgroup:/system.slice/docker.service <->                       
+tcp   LISTEN 0      4096         0.0.0.0:8443       0.0.0.0:*    users:(("docker-proxy",pid=4050,fd=8)) ino:17628 sk:10 cgroup:/system.slice/docker.service <->                      
+tcp   LISTEN 0      4096         0.0.0.0:22         0.0.0.0:*    users:(("sshd",pid=10955,fd=3),("systemd",pid=1,fd=172)) ino:8349 sk:11 cgroup:/system.slice/ssh.socket <->         
+tcp   LISTEN 0      4096         0.0.0.0:81         0.0.0.0:*    users:(("docker-proxy",pid=3489,fd=8)) ino:14216 sk:12 cgroup:/system.slice/docker.service <->                      
+tcp   LISTEN 0      4096         0.0.0.0:80         0.0.0.0:*    users:(("docker-proxy",pid=3379,fd=8)) ino:14128 sk:13 cgroup:/system.slice/docker.service <->                      
+tcp   LISTEN 0      4096         0.0.0.0:5678       0.0.0.0:*    users:(("docker-proxy",pid=4704,fd=8)) ino:19654 sk:14 cgroup:/system.slice/docker.service <->                      
+tcp   LISTEN 0      4096         0.0.0.0:5432       0.0.0.0:*    users:(("docker-proxy",pid=6805,fd=8)) ino:21909 sk:15 cgroup:/system.slice/docker.service <->                      
+tcp   LISTEN 0      4096      127.0.0.54:53         0.0.0.0:*    users:(("systemd-resolve",pid=766,fd=17)) uid:991 ino:8304 sk:16 cgroup:/system.slice/systemd-resolved.service <->  
+tcp   LISTEN 0      4096            [::]:3001          [::]:*    users:(("docker-proxy",pid=4433,fd=8)) ino:18612 sk:17 cgroup:/system.slice/docker.service v6only:1 <->             
+tcp   LISTEN 0      4096            [::]:3000          [::]:*    users:(("docker-proxy",pid=3742,fd=8)) ino:15291 sk:18 cgroup:/system.slice/docker.service v6only:1 <->             
+tcp   LISTEN 0      4096            [::]:6543          [::]:*    users:(("docker-proxy",pid=6858,fd=8)) ino:21932 sk:19 cgroup:/system.slice/docker.service v6only:1 <->             
+tcp   LISTEN 0      4096            [::]:6379          [::]:*    users:(("docker-proxy",pid=2503,fd=8)) ino:12646 sk:1a cgroup:/system.slice/docker.service v6only:1 <->             
+tcp   LISTEN 0      4096            [::]:8080          [::]:*    users:(("docker-proxy",pid=3686,fd=8)) ino:15228 sk:1b cgroup:/system.slice/docker.service v6only:1 <->             
+tcp   LISTEN 0      4096            [::]:4000          [::]:*    users:(("docker-proxy",pid=4092,fd=8)) ino:17655 sk:1c cgroup:/system.slice/docker.service v6only:1 <->             
+tcp   LISTEN 0      4096            [::]:8000          [::]:*    users:(("docker-proxy",pid=4008,fd=8)) ino:17338 sk:1d cgroup:/system.slice/docker.service v6only:1 <->             
+tcp   LISTEN 0      4096            [::]:9090          [::]:*    users:(("docker-proxy",pid=3005,fd=8)) ino:14402 sk:1e cgroup:/system.slice/docker.service v6only:1 <->             
+tcp   LISTEN 0      4096            [::]:443           [::]:*    users:(("docker-proxy",pid=3552,fd=8)) ino:15152 sk:1f cgroup:/system.slice/docker.service v6only:1 <->             
+tcp   LISTEN 0      4096            [::]:8443          [::]:*    users:(("docker-proxy",pid=4057,fd=8)) ino:17629 sk:20 cgroup:/system.slice/docker.service v6only:1 <->             
+tcp   LISTEN 0      4096            [::]:22            [::]:*    users:(("sshd",pid=10955,fd=4),("systemd",pid=1,fd=173)) ino:6557 sk:21 cgroup:/system.slice/ssh.socket v6only:1 <->
+tcp   LISTEN 0      4096            [::]:81            [::]:*    users:(("docker-proxy",pid=3503,fd=8)) ino:14217 sk:22 cgroup:/system.slice/docker.service v6only:1 <->             
+tcp   LISTEN 0      4096            [::]:80            [::]:*    users:(("docker-proxy",pid=3422,fd=8)) ino:14129 sk:23 cgroup:/system.slice/docker.service v6only:1 <->             
+tcp   LISTEN 0      4096            [::]:5678          [::]:*    users:(("docker-proxy",pid=4728,fd=8)) ino:19655 sk:24 cgroup:/system.slice/docker.service v6only:1 <->             
+tcp   LISTEN 0      4096            [::]:5432          [::]:*    users:(("docker-proxy",pid=6823,fd=8)) ino:21910 sk:25 cgroup:/system.slice/docker.service v6only:1 <->             

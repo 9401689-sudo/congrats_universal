@@ -1,0 +1,16 @@
+DRIVER    VOLUME NAME
+local     complaints_m_backups
+local     complaints_m_complaints_m_backups
+local     nextcloud_aio_mastercontainer
+local     nextcloud_db
+local     nextcloud_db_data
+local     nextcloud_nextcloud
+local     nextcloud_nextcloud_app_new
+local     nextcloud_nextcloud_data
+local     nextcloud_nextcloud_db_new
+local     nextcloud_npm_data
+local     nextcloud_npm_letsencrypt
+local     ollama_ollama_data
+local     portainer_portainer_data
+local     redis_redis-data
+local     supabase_db-config

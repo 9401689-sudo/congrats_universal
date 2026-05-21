@@ -1,0 +1,11 @@
+NAME                STATUS              CONFIG FILES
+complaints          running(1)          /var/www/complaints-backend/complaints_m/complaints/docker-compose.yml
+complaints_m        running(1)          /var/www/complaints-backend/complaints_m/docker-compose.yml
+deploy              running(2)          /root/congrats_universal/deploy/docker-compose.server.yml,/root/congrats/deploy/docker-compose.server.yml
+n8n                 running(1)          /data/compose/1/docker-compose.yml
+nextcloud           running(2)          /data/compose/27/docker-compose.yml
+nginx               running(1)          /data/compose/2/docker-compose.yml
+openclaw-prod       running(1)          /srv/openclaw-prod/docker-compose.yml
+portainer           running(1)          /opt/beget/portainer/docker-compose.yml
+redis               running(1)          /data/compose/3/docker-compose.yml
+supabase            running(13)         /root/supabase-project/docker-compose.yml

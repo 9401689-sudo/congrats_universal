@@ -1,0 +1,21 @@
+Only in /mnt/c/1_Work/Работа/Сайты/Боты/server-copy-congrats_universal: .env
+Files /mnt/c/1_Work/Работа/Сайты/Боты/congrats_universal/.gitignore and /mnt/c/1_Work/Работа/Сайты/Боты/server-copy-congrats_universal/.gitignore differ
+Only in /mnt/c/1_Work/Работа/Сайты/Боты/server-copy-congrats_universal: .local-renders
+Only in /mnt/c/1_Work/Работа/Сайты/Боты/congrats_universal: _server_audit
+Only in /mnt/c/1_Work/Работа/Сайты/Боты/congrats_universal: _server_secrets
+Only in /mnt/c/1_Work/Работа/Сайты/Боты/congrats_universal: _server_snapshot
+Only in /mnt/c/1_Work/Работа/Сайты/Боты/congrats_universal: congrats_universal.code-workspace
+Only in /mnt/c/1_Work/Работа/Сайты/Боты/congrats_universal/deploy: cron
+Only in /mnt/c/1_Work/Работа/Сайты/Боты/congrats_universal/deploy: db
+Only in /mnt/c/1_Work/Работа/Сайты/Боты/congrats_universal/deploy: nginx
+Only in /mnt/c/1_Work/Работа/Сайты/Боты/congrats_universal/deploy: server
+Only in /mnt/c/1_Work/Работа/Сайты/Боты/congrats_universal/deploy: systemd
+Files /mnt/c/1_Work/Работа/Сайты/Боты/congrats_universal/package-lock.json and /mnt/c/1_Work/Работа/Сайты/Боты/server-copy-congrats_universal/package-lock.json differ
+Files /mnt/c/1_Work/Работа/Сайты/Боты/congrats_universal/package.json and /mnt/c/1_Work/Работа/Сайты/Боты/server-copy-congrats_universal/package.json differ
+Files /mnt/c/1_Work/Работа/Сайты/Боты/congrats_universal/renderer/legacy/render_doc.py and /mnt/c/1_Work/Работа/Сайты/Боты/server-copy-congrats_universal/renderer/legacy/render_doc.py differ
+Files /mnt/c/1_Work/Работа/Сайты/Боты/congrats_universal/renderer/legacy/render_doc.test-input.json and /mnt/c/1_Work/Работа/Сайты/Боты/server-copy-congrats_universal/renderer/legacy/render_doc.test-input.json differ
+Only in /mnt/c/1_Work/Работа/Сайты/Боты/congrats_universal/src/adapters: app
+Only in /mnt/c/1_Work/Работа/Сайты/Боты/congrats_universal/src/adapters: bot
+Only in /mnt/c/1_Work/Работа/Сайты/Боты/congrats_universal/src/adapters: rendering
+Only in /mnt/c/1_Work/Работа/Сайты/Боты/congrats_universal/src/campaigns: sample-campaign
+Only in /mnt/c/1_Work/Работа/Сайты/Боты/congrats_universal: tools
